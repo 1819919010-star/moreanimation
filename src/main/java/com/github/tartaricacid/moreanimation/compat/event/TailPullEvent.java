@@ -1,23 +1,22 @@
 package com.github.tartaricacid.moreanimation.compat.event;
 
-import com.github.tartaricacid.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.tartaricacid.moreanimation.compat.network.TailPullSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = "moreanimation")
+@EventBusSubscriber(modid = "maidmoreanimation")
 public class TailPullEvent {
     /** 播放 tailpull 动画的时长（tick），动画本身 0.5 秒 ≈ 10 tick */
     private static final long PULL_ANIM_TICKS = 14;
@@ -32,7 +31,7 @@ public class TailPullEvent {
     private static final Map<UUID, Long> COOLDOWN_UNTIL = new ConcurrentHashMap<>();
 
     @SubscribeEvent
-    public static void onAttack(LivingAttackEvent event) {
+    public static void onIncomingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity().level().isClientSide()) return;
         if (event.getEntity().isInvulnerable()) return;
         if (!(event.getEntity() instanceof EntityMaid maid)) return;
@@ -68,11 +67,10 @@ public class TailPullEvent {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        if (event.level.isClientSide()) return;
+    public static void onServerTick(LevelTickEvent.Post event) {
+        if (event.getLevel().isClientSide()) return;
 
-        ServerLevel level = (ServerLevel) event.level;
+        ServerLevel level = (ServerLevel) event.getLevel();
         long now = level.getGameTime();
 
         Iterator<Map.Entry<UUID, Long>> it = PENDING_ANIMS.entrySet().iterator();
@@ -113,7 +111,6 @@ public class TailPullEvent {
     }
 
     private static void sendPullState(ServerLevel level, EntityMaid maid, boolean pulling) {
-        MoreAnimationNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> maid),
-                new TailPullSyncPacket(maid.getId(), pulling));
+        PacketDistributor.sendToPlayersTrackingEntity(maid, new TailPullSyncPacket(maid.getId(), pulling));
     }
 }

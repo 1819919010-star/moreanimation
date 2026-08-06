@@ -1,6 +1,5 @@
 package com.github.tartaricacid.moreanimation.compat.event;
 
-import com.github.tartaricacid.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.tartaricacid.moreanimation.compat.network.HuggingSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.resources.ResourceKey;
@@ -8,17 +7,17 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = "moreanimation")
+@EventBusSubscriber(modid = "maidmoreanimation")
 public class HugAnimationEvent {
     /** 触发拥抱的距离（格） */
     private static final double TRIGGER_DISTANCE = 0.7D;
@@ -43,11 +42,10 @@ public class HugAnimationEvent {
     private static final Map<UUID, Long> COOLDOWN_UNTIL = new ConcurrentHashMap<>();
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        if (event.level.isClientSide()) return;
+    public static void onServerTick(LevelTickEvent.Post event) {
+        if (event.getLevel().isClientSide()) return;
 
-        ServerLevel level = (ServerLevel) event.level;
+        ServerLevel level = (ServerLevel) event.getLevel();
         long now = level.getGameTime();
 
         // 1. 维护已有会话
@@ -180,8 +178,7 @@ public class HugAnimationEvent {
         }
         HUG_SENT_STATE.put(maidUuid, hugging);
         if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
-            MoreAnimationNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> maid),
-                    new HuggingSyncPacket(maid.getId(), hugging));
+            PacketDistributor.sendToPlayersTrackingEntity(maid, new HuggingSyncPacket(maid.getId(), hugging));
         }
         if (!hugging) {
             // 会话彻底结束后清理发送状态

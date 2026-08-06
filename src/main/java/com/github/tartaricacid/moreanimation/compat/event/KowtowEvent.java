@@ -1,22 +1,21 @@
 package com.github.tartaricacid.moreanimation.compat.event;
 
 import com.github.tartaricacid.moreanimation.compat.network.KowtowSyncPacket;
-import com.github.tartaricacid.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.projectile.Projectile;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = "moreanimation")
+@EventBusSubscriber(modid = "maidmoreanimation")
 public class KowtowEvent {
     /** 播放 kowtow 动画的时长（tick） */
     private static final long KOWTOW_ANIM_TICKS = 60;
@@ -25,7 +24,7 @@ public class KowtowEvent {
     private static final Map<UUID, Long> PENDING_ANIMS = new ConcurrentHashMap<>();
 
     @SubscribeEvent
-    public static void onHurt(LivingHurtEvent event) {
+    public static void onIncomingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity().level().isClientSide()) return;
         if (!(event.getEntity() instanceof EntityMaid maid)) return;
         // 必须是投射物（火球、箭、雪球等远程击中）
@@ -39,11 +38,10 @@ public class KowtowEvent {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        if (event.level.isClientSide()) return;
+    public static void onServerTick(LevelTickEvent.Post event) {
+        if (event.getLevel().isClientSide()) return;
 
-        ServerLevel level = (ServerLevel) event.level;
+        ServerLevel level = (ServerLevel) event.getLevel();
         long now = level.getGameTime();
 
         Iterator<Map.Entry<UUID, Long>> it = PENDING_ANIMS.entrySet().iterator();
@@ -60,7 +58,6 @@ public class KowtowEvent {
     }
 
     private static void sendKowtowState(ServerLevel level, EntityMaid maid, boolean kowtowing) {
-        MoreAnimationNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> maid),
-                new KowtowSyncPacket(maid.getId(), kowtowing));
+        PacketDistributor.sendToPlayersTrackingEntity(maid, new KowtowSyncPacket(maid.getId(), kowtowing));
     }
 }

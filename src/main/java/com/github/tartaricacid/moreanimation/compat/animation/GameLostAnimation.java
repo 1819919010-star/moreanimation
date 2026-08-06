@@ -9,9 +9,10 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 
 import java.util.Map;
 import java.util.UUID;
@@ -30,7 +31,7 @@ public class GameLostAnimation {
     private static final long KOWTOW_DURATION_TICKS = 60;
 
     public static void init() {
-        if (FMLEnvironment.dist != net.minecraftforge.api.distmarker.Dist.CLIENT) return;
+        if (FMLEnvironment.dist != Dist.CLIENT) return;
         AnimationManager manager = AnimationManager.getInstance();
 
             // 1. game_lost2、use_mainhand:gohei、!??!、CLEANTAIL：通过 Mixin 注入
@@ -173,7 +174,7 @@ public class GameLostAnimation {
                     }
             ));
 
-            MinecraftForge.EVENT_BUS.addListener((LivingHurtEvent e) -> {
+            NeoForge.EVENT_BUS.addListener((LivingIncomingDamageEvent e) -> {
                 if (!(e.getEntity() instanceof EntityMaid maid)) return;
                 if (!(e.getSource().getEntity() instanceof Player)) return;
                 UUID uuid = maid.getUUID();

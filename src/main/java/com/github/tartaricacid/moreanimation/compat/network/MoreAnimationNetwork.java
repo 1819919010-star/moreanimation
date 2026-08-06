@@ -1,30 +1,15 @@
 package com.github.tartaricacid.moreanimation.compat.network;
 
-import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.simple.SimpleChannel;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public class MoreAnimationNetwork {
     private static final String PROTOCOL_VERSION = "1";
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation("moreanimation:anim"),
-            () -> PROTOCOL_VERSION,
-            PROTOCOL_VERSION::equals,
-            PROTOCOL_VERSION::equals
-    );
 
-    public static void init() {
-        CHANNEL.registerMessage(0, HuggingSyncPacket.class,
-                HuggingSyncPacket::encode,
-                HuggingSyncPacket::new,
-                HuggingSyncPacket::handle);
-        CHANNEL.registerMessage(1, TailPullSyncPacket.class,
-                TailPullSyncPacket::encode,
-                TailPullSyncPacket::new,
-                TailPullSyncPacket::handle);
-        CHANNEL.registerMessage(2, KowtowSyncPacket.class,
-                KowtowSyncPacket::encode,
-                KowtowSyncPacket::new,
-                KowtowSyncPacket::handle);
+    public static void register(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
+        registrar.playToClient(HuggingSyncPacket.TYPE, HuggingSyncPacket.STREAM_CODEC, HuggingSyncPacket::handle);
+        registrar.playToClient(TailPullSyncPacket.TYPE, TailPullSyncPacket.STREAM_CODEC, TailPullSyncPacket::handle);
+        registrar.playToClient(KowtowSyncPacket.TYPE, KowtowSyncPacket.STREAM_CODEC, KowtowSyncPacket::handle);
     }
 }

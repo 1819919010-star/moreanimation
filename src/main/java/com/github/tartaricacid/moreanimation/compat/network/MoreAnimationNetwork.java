@@ -26,5 +26,9 @@ public class MoreAnimationNetwork {
                 KowtowSyncPacket::encode,
                 KowtowSyncPacket::new,
                 KowtowSyncPacket::handle);
+        CHANNEL.registerMessage(3, PraySyncPacket.class,
+                PraySyncPacket::encode,
+                PraySyncPacket::new,
+                PraySyncPacket::handle);
     }
 }

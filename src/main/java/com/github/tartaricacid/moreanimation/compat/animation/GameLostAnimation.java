@@ -5,11 +5,15 @@ import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.Animation
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.Priority;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.builder.ILoopType;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
@@ -30,13 +34,26 @@ public class GameLostAnimation {
     private static final long KOWTOW_DURATION_TICKS = 60;
 
     public static void init() {
+        // 服务端逻辑：女仆血量低于 30% 时持续清除寻路目标，直到血量恢复
+        MinecraftForge.EVENT_BUS.addListener((TickEvent.LevelTickEvent event) -> {
+            if (event.phase != TickEvent.Phase.END) return;
+            if (!(event.level instanceof ServerLevel serverLevel)) return;
+            for (Entity entity : serverLevel.getAllEntities()) {
+                if (entity instanceof EntityMaid maid && maid.isAlive()) {
+                    if (maid.getHealth() < maid.getMaxHealth() * 0.3f) {
+                        maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+                    }
+                }
+            }
+        });
+
         if (FMLEnvironment.dist != net.minecraftforge.api.distmarker.Dist.CLIENT) return;
         AnimationManager manager = AnimationManager.getInstance();
 
             // 1. game_lost2、use_mainhand:gohei、!??!、CLEANTAIL：通过 Mixin 注入
             //    AnimationManager.predicateMisc，在 MISC 控制器上叠加播放
 
-            // 2. morebeg 动画：女仆血量低于一半时触发
+            // 2. morebeg 动画：女仆血量低于 30% 时循环播放
             manager.register(new AnimationState(
                     "morebeg",
                     ILoopType.EDefaultLoopTypes.LOOP,
@@ -45,7 +62,7 @@ public class GameLostAnimation {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         float health = entity.getHealth();
                         float maxHealth = entity.getMaxHealth();
-                        return health < maxHealth * 0.5f;
+                        return health < maxHealth * 0.3f;
                     }
             ));
 
@@ -170,6 +187,28 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         return entity.isInWater() && entity.getAirSupply() <= 0;
+                    }
+            ));
+
+            // 12. situp 动画：女仆睡觉时持续播放
+            manager.register(new AnimationState(
+                    "situp",
+                    ILoopType.EDefaultLoopTypes.LOOP,
+                    Priority.HIGHEST,
+                    (maid, animEvent) -> {
+                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        return entity.isSleeping();
+                    }
+            ));
+
+            // 13. pray 动画：女仆在神龛附近祈祷时播放一次（服务端判定 + 同步包标记）
+            manager.register(new AnimationState(
+                    "pray",
+                    ILoopType.EDefaultLoopTypes.PLAY_ONCE,
+                    Priority.HIGHEST,
+                    (maid, animEvent) -> {
+                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        return entity.getPersistentData().getBoolean("moreanimation_pray");
                     }
             ));
 

@@ -74,6 +74,14 @@ public class AnimationManagerMixin {
             return;
         }
 
+        // circledance: owner holding sugar
+        if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.SUGAR)) {
+            event.getController().setAnimation(new AnimationBuilder().addAnimation("circledance", ILoopType.EDefaultLoopTypes.LOOP));
+            cir.setReturnValue(PlayState.CONTINUE);
+            cir.cancel();
+            return;
+        }
+
         // CLEANTAIL: owner holding stick
         if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.STICK)) {
             event.getController().setAnimation(new AnimationBuilder().addAnimation("CLEANTAIL", ILoopType.EDefaultLoopTypes.LOOP));

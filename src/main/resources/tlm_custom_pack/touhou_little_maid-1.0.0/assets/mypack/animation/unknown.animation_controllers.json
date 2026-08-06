@@ -1,0 +1,26 @@
+{
+	"format_version": "1.19.0",
+	"animation_controllers": {
+		"controller.animation.unknown.new2": {
+			"initial_state": "idle",
+			"states": {
+				"idle": {
+					"animations": ["CLEANTAIL"],
+					"on_entry": [],
+					"on_exit": [],
+					"transitions": [
+						{"walking": ""}
+					],
+					"blend_transition": 1
+				},
+				"walking": {
+					"animations": ["walk"],
+					"transitions": [
+						{"idle": "q.ground_speed < 0.8"}
+					],
+					"blend_transition": 1
+				}
+			}
+		}
+	}
+}

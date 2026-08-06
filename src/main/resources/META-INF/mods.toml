@@ -1,0 +1,24 @@
+modLoader = "javafml"
+loaderVersion = "[47,48)"
+license = "All rights reserved"
+
+[[mods]]
+modId = "moreanimation"
+version = "1.0.0"
+displayName = "More Animation"
+authors = "JumDa5he"
+description = "More maid animations: hug, tail pull and more."
+
+[[dependencies."moreanimation"]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,48)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."moreanimation"]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,1.21)"
+ordering = "NONE"
+side = "BOTH"

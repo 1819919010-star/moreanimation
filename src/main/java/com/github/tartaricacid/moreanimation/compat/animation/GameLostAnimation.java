@@ -7,6 +7,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.builder.ILoopType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -25,6 +26,8 @@ public class GameLostAnimation {
     private static final long ATTACK_WINDOW_TICKS = 100;
     private static final Map<UUID, Long> hurtStartTick = new ConcurrentHashMap<>();
     private static final long HURT_DURATION_TICKS = 100;
+    private static final Map<UUID, Long> kowtowStartTick = new ConcurrentHashMap<>();
+    private static final long KOWTOW_DURATION_TICKS = 60;
 
     public static void init() {
         if (FMLEnvironment.dist != net.minecraftforge.api.distmarker.Dist.CLIENT) return;
@@ -136,14 +139,26 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 10. kowtow 动画：女仆被投射物（远程）击中时触发一次（服务端判定 + 同步包标记）
+            // 10. kowtow 动画：女仆被投射物（远程）击中时触发一次
+            // 双通道判定：客户端本地监听（单机/局域网都能触发）+ 服务端同步包标记（联机保底）
             manager.register(new AnimationState(
                     "kowtow",
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
-                        return entity.getPersistentData().getBoolean("moreanimation_kowtow");
+                        if (entity.getPersistentData().getBoolean("moreanimation_kowtow")) {
+                            return true;
+                        }
+                        UUID uuid = entity.getUUID();
+                        Long start = kowtowStartTick.get(uuid);
+                        if (start != null) {
+                            if (entity.tickCount - start < KOWTOW_DURATION_TICKS) {
+                                return true;
+                            }
+                            kowtowStartTick.remove(uuid);
+                        }
+                        return false;
                     }
             ));
 
@@ -172,6 +187,11 @@ public class GameLostAnimation {
                     attackCount.put(uuid, 1);
                 }
                 lastAttackTime.put(uuid, now);
+
+                // Kowtow trigger (ranged): 客户端本地判定，单机/局域网直接触发
+                if (e.getSource().getDirectEntity() instanceof Projectile) {
+                    kowtowStartTick.putIfAbsent(uuid, now);
+                }
             });
     }
 }

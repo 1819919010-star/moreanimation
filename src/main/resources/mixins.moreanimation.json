@@ -1,0 +1,12 @@
+{
+    "required": true,
+    "minVersion": "0.8",
+    "package": "com.github.JumDa5he.moreanimation.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "mixins": [
+        "AnimationManagerMixin"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}

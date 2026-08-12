@@ -11,22 +11,22 @@ import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
-public record TailPullSyncPacket(int entityId, boolean pulling) implements CustomPacketPayload {
-    private static final String TAG_TAILPULL = "moreanimation_tailpull";
+public record CleanTailSyncPacket(int entityId, boolean cleaning) implements CustomPacketPayload {
+    private static final String TAG_CLEANTAIL = "moreanimation_cleantail";
 
-    public static final CustomPacketPayload.Type<TailPullSyncPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MaidMoreAnimation.MOD_ID, "tailpull"));
+    public static final CustomPacketPayload.Type<CleanTailSyncPacket> TYPE =
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MaidMoreAnimation.MOD_ID, "cleantail"));
 
-    public static final StreamCodec<ByteBuf, TailPullSyncPacket> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.VAR_INT, TailPullSyncPacket::entityId,
-            ByteBufCodecs.BOOL, TailPullSyncPacket::pulling,
-            TailPullSyncPacket::new);
+    public static final StreamCodec<ByteBuf, CleanTailSyncPacket> STREAM_CODEC = StreamCodec.composite(
+            ByteBufCodecs.VAR_INT, CleanTailSyncPacket::entityId,
+            ByteBufCodecs.BOOL, CleanTailSyncPacket::cleaning,
+            CleanTailSyncPacket::new);
 
-    public static void handle(TailPullSyncPacket message, IPayloadContext context) {
+    public static void handle(CleanTailSyncPacket message, IPayloadContext context) {
         context.enqueueWork(() -> {
             Entity entity = Minecraft.getInstance().level.getEntity(message.entityId());
             if (entity != null) {
-                entity.getPersistentData().putBoolean(TAG_TAILPULL, message.pulling());
+                entity.getPersistentData().putBoolean(TAG_CLEANTAIL, message.cleaning());
             }
         });
     }

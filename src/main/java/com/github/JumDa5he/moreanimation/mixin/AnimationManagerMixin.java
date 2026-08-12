@@ -74,17 +74,23 @@ public class AnimationManagerMixin {
             return;
         }
 
-        // CLEANTAIL: owner holding stick
-        if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.STICK)) {
-            event.getController().setAnimation(new AnimationBuilder().addAnimation("CLEANTAIL", ILoopType.EDefaultLoopTypes.LOOP));
+        // circledance: owner holding sugar
+        if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.SUGAR)) {
+            event.getController().setAnimation(new AnimationBuilder().addAnimation("circledance", ILoopType.EDefaultLoopTypes.LOOP));
             cir.setReturnValue(PlayState.CONTINUE);
             cir.cancel();
             return;
         }
 
-        // use_mainhand:gohei: owner holding cake
-        if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.CAKE)) {
-            event.getController().setAnimation(new AnimationBuilder().addAnimation("use_mainhand:gohei", ILoopType.EDefaultLoopTypes.LOOP));
+        // CLEANTAIL: tailpull 累计触发（服务端同步 flag），或主人手持木棍
+        if (entity.getPersistentData().getBoolean("moreanimation_cleantail")) {
+            event.getController().setAnimation(new AnimationBuilder().addAnimation("CLEANTAIL", ILoopType.EDefaultLoopTypes.LOOP));
+            cir.setReturnValue(PlayState.CONTINUE);
+            cir.cancel();
+            return;
+        }
+        if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.STICK)) {
+            event.getController().setAnimation(new AnimationBuilder().addAnimation("CLEANTAIL", ILoopType.EDefaultLoopTypes.LOOP));
             cir.setReturnValue(PlayState.CONTINUE);
             cir.cancel();
             return;

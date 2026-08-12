@@ -11,22 +11,22 @@ import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
-public record TailPullSyncPacket(int entityId, boolean pulling) implements CustomPacketPayload {
-    private static final String TAG_TAILPULL = "moreanimation_tailpull";
+public record PraySyncPacket(int entityId, boolean praying) implements CustomPacketPayload {
+    private static final String TAG_PRAY = "moreanimation_pray";
 
-    public static final CustomPacketPayload.Type<TailPullSyncPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MaidMoreAnimation.MOD_ID, "tailpull"));
+    public static final CustomPacketPayload.Type<PraySyncPacket> TYPE =
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MaidMoreAnimation.MOD_ID, "pray"));
 
-    public static final StreamCodec<ByteBuf, TailPullSyncPacket> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.VAR_INT, TailPullSyncPacket::entityId,
-            ByteBufCodecs.BOOL, TailPullSyncPacket::pulling,
-            TailPullSyncPacket::new);
+    public static final StreamCodec<ByteBuf, PraySyncPacket> STREAM_CODEC = StreamCodec.composite(
+            ByteBufCodecs.VAR_INT, PraySyncPacket::entityId,
+            ByteBufCodecs.BOOL, PraySyncPacket::praying,
+            PraySyncPacket::new);
 
-    public static void handle(TailPullSyncPacket message, IPayloadContext context) {
+    public static void handle(PraySyncPacket message, IPayloadContext context) {
         context.enqueueWork(() -> {
             Entity entity = Minecraft.getInstance().level.getEntity(message.entityId());
             if (entity != null) {
-                entity.getPersistentData().putBoolean(TAG_TAILPULL, message.pulling());
+                entity.getPersistentData().putBoolean(TAG_PRAY, message.praying());
             }
         });
     }

@@ -1,36 +1,38 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
+import com.github.JumDa5he.moreanimation.MaidMoreAnimation;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import org.jetbrains.annotations.NotNull;
 
 public record HuggingSyncPacket(int entityId, boolean hugging) implements CustomPacketPayload {
     private static final String TAG_HUGGING = "moreanimation_hugging";
 
-    public static final Type<HuggingSyncPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("maidmoreanimation", "hugging_sync"));
-    public static final StreamCodec<FriendlyByteBuf, HuggingSyncPacket> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.INT, HuggingSyncPacket::entityId,
+    public static final CustomPacketPayload.Type<HuggingSyncPacket> TYPE =
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MaidMoreAnimation.MOD_ID, "hugging"));
+
+    public static final StreamCodec<ByteBuf, HuggingSyncPacket> STREAM_CODEC = StreamCodec.composite(
+            ByteBufCodecs.VAR_INT, HuggingSyncPacket::entityId,
             ByteBufCodecs.BOOL, HuggingSyncPacket::hugging,
-            HuggingSyncPacket::new
-    );
+            HuggingSyncPacket::new);
 
-    @Override
-    public Type<? extends CustomPacketPayload> type() {
-        return TYPE;
-    }
-
-    public static void handle(HuggingSyncPacket payload, IPayloadContext context) {
+    public static void handle(HuggingSyncPacket message, IPayloadContext context) {
         context.enqueueWork(() -> {
-            Entity entity = Minecraft.getInstance().level.getEntity(payload.entityId());
+            Entity entity = Minecraft.getInstance().level.getEntity(message.entityId());
             if (entity != null) {
-                var data = entity.getPersistentData();
-                data.putBoolean(TAG_HUGGING, payload.hugging());
+                entity.getPersistentData().putBoolean(TAG_HUGGING, message.hugging());
             }
         });
+    }
+
+    @Override
+    public @NotNull Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

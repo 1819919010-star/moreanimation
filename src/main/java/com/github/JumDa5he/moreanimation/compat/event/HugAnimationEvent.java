@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.MaidMoreAnimation;
 import com.github.JumDa5he.moreanimation.compat.network.HuggingSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.resources.ResourceKey;
@@ -17,7 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@EventBusSubscriber(modid = "maidmoreanimation")
+@EventBusSubscriber(modid = MaidMoreAnimation.MOD_ID)
 public class HugAnimationEvent {
     /** 触发拥抱的距离（格） */
     private static final double TRIGGER_DISTANCE = 0.7D;

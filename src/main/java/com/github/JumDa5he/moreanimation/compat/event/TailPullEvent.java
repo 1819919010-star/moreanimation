@@ -1,12 +1,13 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.network.CleanTailSyncPacket;
+import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.network.TailPullSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -15,46 +16,50 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@EventBusSubscriber(modid = "maidmoreanimation")
+@EventBusSubscriber(modid = "moreanimation")
 public class TailPullEvent {
     /** 播放 tailpull 动画的时长（tick），动画本身 0.5 秒 ≈ 10 tick */
     private static final long PULL_ANIM_TICKS = 14;
     /** 反向击退的初速度（格/tick） */
-    private static final double KNOCKBACK_SPEED = 0.6D;
+    private static final double KNOCKBACK_SPEED = 1.0D;
     /** 一次触发后，多久内不再重复触发 */
-    private static final long COOLDOWN_TICKS = 200;
+    private static final long COOLDOWN_TICKS = 20;
+    /** 触发距离上限（格） */
+    private static final double TRIGGER_DISTANCE = 4.5D;
+    /** 播放 cleantail 动画的时长（tick），动画本身 2.33 秒 ≈ 47 tick */
+    private static final long CLEANTAIL_ANIM_TICKS = 48;
+    /** 累计拉几次后触发一次 cleantail */
+    private static final int PULLS_FOR_CLEANTAIL = 3;
 
     /** maidUuid -> 动画结束时间点（gameTime），到点向客户端发 false */
     private static final Map<UUID, Long> PENDING_ANIMS = new ConcurrentHashMap<>();
     /** maidUuid -> 冷却结束时间点（gameTime） */
     private static final Map<UUID, Long> COOLDOWN_UNTIL = new ConcurrentHashMap<>();
+    /** maidUuid -> cleantail 动画结束时间点（gameTime） */
+    private static final Map<UUID, Long> PENDING_CLEANTAIL = new ConcurrentHashMap<>();
+    /** maidUuid -> 累计被拉次数 */
+    private static final Map<UUID, Integer> PULL_COUNT = new ConcurrentHashMap<>();
 
-    @SubscribeEvent
-    public static void onIncomingDamage(LivingIncomingDamageEvent event) {
-        if (event.getEntity().level().isClientSide()) return;
-        if (event.getEntity().isInvulnerable()) return;
-        if (!(event.getEntity() instanceof EntityMaid maid)) return;
-        if (!(event.getSource().getEntity() instanceof Player player)) return;
-        // 必须是空手攻击
-        if (!player.getMainHandItem().isEmpty()) return;
-        if (!maid.isAlive()) return;
+    /**
+     * 由 TailPullTriggerPacket 调用（服务端线程）。
+     * 玩家潜行+空手+左键点击女仆时触发，把女仆拉向玩家并播放 tailpull 动画。
+     */
+    public static void triggerTailPull(ServerPlayer player, EntityMaid maid) {
+        if (player == null || maid == null || !maid.isAlive()) return;
+        if (player.distanceToSqr(maid) > TRIGGER_DISTANCE * TRIGGER_DISTANCE) return;
 
         ServerLevel level = (ServerLevel) maid.level();
         long now = level.getGameTime();
         if (isCooldown(maid, now)) return;
 
-        // 女仆必须背对着玩家（玩家在女仆的背后）
-        if (!isBehind(maid, player)) return;
-
-        // 取消原伤害与击退，改为反向击退：把女仆拉向玩家
-        event.setCanceled(true);
+        // 反向击退：把女仆拉向玩家
         double dx = player.getX() - maid.getX();
         double dz = player.getZ() - maid.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
         if (dist > 0.01D) {
             double k = KNOCKBACK_SPEED / dist;
             maid.setDeltaMovement(dx * k, maid.getDeltaMovement().y + 0.2D, dz * k);
-            maid.hurtMarked = true;
+            maid.hasImpulse = true;
         }
 
         // 播放 tailpull 动画
@@ -63,6 +68,16 @@ public class TailPullEvent {
         sendPullState(level, maid, true);
         System.out.println("[MoreAnimation] tailpull triggered: " + maid.getUUID()
                 + " by " + player.getGameProfile().getName() + " at tick " + now);
+
+        // 累计拉 3 次后触发一次 cleantail
+        int count = PULL_COUNT.merge(maid.getUUID(), 1, Integer::sum);
+        if (count >= PULLS_FOR_CLEANTAIL) {
+            PULL_COUNT.remove(maid.getUUID());
+            PENDING_CLEANTAIL.put(maid.getUUID(), now + CLEANTAIL_ANIM_TICKS);
+            sendCleanTailState(level, maid, true);
+            System.out.println("[MoreAnimation] cleantail triggered after " + count
+                    + " pulls: " + maid.getUUID() + " at tick " + now);
+        }
     }
 
     @SubscribeEvent
@@ -83,25 +98,18 @@ public class TailPullEvent {
                 }
             }
         }
-    }
 
-    /**
-     * 背对判定：玩家在女仆背后（位置），且两人朝向接近（角度差 < 100 度，宽松）
-     */
-    private static boolean isBehind(EntityMaid maid, Player player) {
-        // 1. 玩家在女仆的背后（放宽：点积 < 0.1，允许轻微偏侧）
-        float yaw = maid.getYRot();
-        float fx = (float) -Math.sin(Math.toRadians(yaw));
-        float fz = (float) Math.cos(Math.toRadians(yaw));
-        double dx = player.getX() - maid.getX();
-        double dz = player.getZ() - maid.getZ();
-        boolean inBack = dx * fx + dz * fz < 0.1D;
-        if (!inBack) {
-            return false;
+        Iterator<Map.Entry<UUID, Long>> ct = PENDING_CLEANTAIL.entrySet().iterator();
+        while (ct.hasNext()) {
+            Map.Entry<UUID, Long> entry = ct.next();
+            UUID maidUuid = entry.getKey();
+            if (now >= entry.getValue()) {
+                ct.remove();
+                if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
+                    sendCleanTailState(level, maid, false);
+                }
+            }
         }
-        // 2. 两人朝向接近（同向才叫背对，放宽到 100 度）
-        float angleDiff = Math.abs(net.minecraft.util.Mth.wrapDegrees(player.getYRot() - maid.getYRot()));
-        return angleDiff < 100.0F;
     }
 
     private static boolean isCooldown(EntityMaid maid, long now) {
@@ -111,5 +119,9 @@ public class TailPullEvent {
 
     private static void sendPullState(ServerLevel level, EntityMaid maid, boolean pulling) {
         PacketDistributor.sendToPlayersTrackingEntity(maid, new TailPullSyncPacket(maid.getId(), pulling));
+    }
+
+    private static void sendCleanTailState(ServerLevel level, EntityMaid maid, boolean cleaning) {
+        PacketDistributor.sendToPlayersTrackingEntity(maid, new CleanTailSyncPacket(maid.getId(), cleaning));
     }
 }

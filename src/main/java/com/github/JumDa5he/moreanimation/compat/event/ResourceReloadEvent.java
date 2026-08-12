@@ -1,8 +1,7 @@
-package com.github.tartaricacid.moreanimation.compat.event;
+package com.github.JumDa5he.moreanimation.compat.event;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.resource.CustomPackLoader;
-import com.github.tartaricacid.touhoulittlemaid.client.resource.GeckoModelLoader;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.builder.Animation;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.molang.MolangParser;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.file.AnimationFile;

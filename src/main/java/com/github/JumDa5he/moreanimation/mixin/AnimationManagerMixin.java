@@ -1,4 +1,4 @@
-package com.github.tartaricacid.moreanimation.mixin;
+package com.github.JumDa5he.moreanimation.mixin;
 
 import com.github.tartaricacid.touhoulittlemaid.api.entity.IMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationManager;

@@ -1,7 +1,7 @@
-package com.github.tartaricacid.moreanimation;
+package com.github.JumDa5he.moreanimation;
 
-import com.github.tartaricacid.moreanimation.compat.animation.GameLostAnimation;
-import com.github.tartaricacid.moreanimation.compat.network.MoreAnimationNetwork;
+import com.github.JumDa5he.moreanimation.compat.animation.GameLostAnimation;
+import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 

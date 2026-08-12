@@ -1,4 +1,4 @@
-package com.github.tartaricacid.moreanimation.compat.network;
+package com.github.JumDa5he.moreanimation.compat.network;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;

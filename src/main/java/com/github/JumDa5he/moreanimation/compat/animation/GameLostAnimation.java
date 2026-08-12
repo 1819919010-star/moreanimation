@@ -1,4 +1,4 @@
-package com.github.tartaricacid.moreanimation.compat.animation;
+package com.github.JumDa5he.moreanimation.compat.animation;
 
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationManager;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationState;

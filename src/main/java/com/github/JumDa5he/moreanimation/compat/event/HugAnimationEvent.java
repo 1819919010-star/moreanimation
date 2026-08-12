@@ -1,6 +1,6 @@
-package com.github.tartaricacid.moreanimation.compat.event;
+package com.github.JumDa5he.moreanimation.compat.event;
 
-import com.github.tartaricacid.moreanimation.compat.network.HuggingSyncPacket;
+import com.github.JumDa5he.moreanimation.compat.network.HuggingSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;

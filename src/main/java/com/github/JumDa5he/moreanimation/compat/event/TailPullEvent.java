@@ -1,9 +1,8 @@
-package com.github.tartaricacid.moreanimation.compat.event;
+package com.github.JumDa5he.moreanimation.compat.event;
 
-import com.github.tartaricacid.moreanimation.compat.network.TailPullSyncPacket;
+import com.github.JumDa5he.moreanimation.compat.network.TailPullSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;

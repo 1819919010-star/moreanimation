@@ -1,4 +1,4 @@
-package com.github.tartaricacid.moreanimation.compat.network;
+package com.github.JumDa5he.moreanimation.compat.network;
 
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;

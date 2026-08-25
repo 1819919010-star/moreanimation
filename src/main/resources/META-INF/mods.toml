@@ -4,10 +4,10 @@ license = "All rights reserved"
 
 [[mods]]
 modId = "moreanimation"
-version = "1.0.0"
+version = "1.0.1"
 displayName = "More Animation"
 authors = "JumDa5he"
-description = "More maid animations: hug, tail pull and more."
+description = "给酒狐添加更多动作"
 
 [[dependencies."moreanimation"]]
 modId = "forge"

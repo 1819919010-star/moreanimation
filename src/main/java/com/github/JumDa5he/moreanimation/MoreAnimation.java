@@ -6,6 +6,8 @@ import com.github.JumDa5he.moreanimation.compat.util.CustomPackInstaller;
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
 import com.github.JumDa5he.moreanimation.core.ModItems;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
@@ -24,5 +26,13 @@ public class MoreAnimation {
 
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModItems.ITEMS.register(modBus);
+        modBus.addListener(this::addCreativeTabItems);
+    }
+
+    private void addCreativeTabItems(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            event.accept(ModItems.EXPRESSION_ITEM);
+            event.accept(ModItems.HAND);
+        }
     }
 }

@@ -5,6 +5,14 @@
     "compatibilityLevel": "JAVA_17",
     "refmap": "mixins.moreanimation.refmap.json",
     "mixins": [
-        "AnimationManagerMixin"
+        "LivingEntityDeathMixin",
+        "MaidFollowOwnerTaskMixin",
+        "MaidFollowOwnerVehicleTaskMixin"
+    ],
+    "client": [
+        "AnimationManagerMixin",
+        "AnimationProcessorMixin",
+        "GeckoMaidEntityMixin",
+        "GeckoModelLoaderMixin"
     ]
 }

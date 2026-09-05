@@ -5,7 +5,9 @@ import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -25,7 +27,9 @@ public class EarPullEvent {
     private static final long LONG_PRESS_TICKS = 10;
     private static final long HOLD_TIMEOUT_TICKS = 20;
     private static final double HOLD_MAX_DISTANCE = 12.0;
-    private static final double DRAG_SPEED = 0.18;
+    private static final double DRAG_RESPONSE = 0.35;
+    private static final double DRAG_MAX_SPEED = 0.55;
+    private static final double DRAG_VELOCITY_BLEND = 0.65;
     private static final double TARGET_DISTANCE = 0.8;
 
     private static final Map<UUID, Long> PENDING_ANIMS = new ConcurrentHashMap<>();
@@ -138,7 +142,7 @@ public class EarPullEvent {
                 continue;
             }
             // 目标点：玩家面朝方向身前方 0.8 格（玩家不动则停在其身前，玩家移动则跟随）
-            net.minecraft.world.phys.Vec3 look = holder.getLookAngle();
+            Vec3 look = holder.getLookAngle();
             double lx = look.x;
             double lz = look.z;
             double len = Math.hypot(lx, lz);
@@ -151,21 +155,40 @@ public class EarPullEvent {
             lz /= len;
             double tx = holder.getX() + lx * TARGET_DISTANCE;
             double tz = holder.getZ() + lz * TARGET_DISTANCE;
-            // 强拖：每 tick 直接改写坐标移向目标点，绕过 AI/击退干扰（ServerEntity 自动同步给客户端插值）
+            // Smooth spring drag: velocity is synced and interpolated by the client. Directly
+            // changing setPos here makes remote maids advance in visible server-sized steps.
             double mdx = tx - maid.getX();
             double mdz = tz - maid.getZ();
             double mdist = Math.hypot(mdx, mdz);
-            if (mdist > 0.05D) {
-                double step = Math.min(DRAG_SPEED, mdist);
-                maid.setPos(maid.getX() + mdx / mdist * step, maid.getY(), maid.getZ() + mdz / mdist * step);
+            Vec3 holderVelocity = holder.getDeltaMovement();
+            // Feed the holder's own movement into the target velocity. Without this term the
+            // maid stops whenever she reaches the target, falls behind, then catches up in pulses.
+            double targetVx = clamp(holderVelocity.x + mdx * DRAG_RESPONSE,
+                    -DRAG_MAX_SPEED, DRAG_MAX_SPEED);
+            double targetVz = clamp(holderVelocity.z + mdz * DRAG_RESPONSE,
+                    -DRAG_MAX_SPEED, DRAG_MAX_SPEED);
+            if (mdist < 0.05D) {
+                targetVx = holderVelocity.x;
+                targetVz = holderVelocity.z;
             }
+            Vec3 velocity = maid.getDeltaMovement();
+            double vx = velocity.x + (targetVx - velocity.x) * DRAG_VELOCITY_BLEND;
+            double vz = velocity.z + (targetVz - velocity.z) * DRAG_VELOCITY_BLEND;
+            maid.getNavigation().stop();
+            maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+            maid.getBrain().eraseMemory(MemoryModuleType.PATH);
+            maid.setDeltaMovement(vx, velocity.y, vz);
+            maid.hurtMarked = true;
             // 面朝玩家（MC 坐标轴换算 +180 修正朝向）
             float yaw = (float) (Math.atan2(dz, dx) * 180.0 / Math.PI) + 90.0F;
             maid.setYRot(yaw);
             maid.setYBodyRot(yaw);
             maid.setYHeadRot(yaw);
-            state.lastTick = now;
         }
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static boolean isCooldown(EntityMaid maid, long now) {

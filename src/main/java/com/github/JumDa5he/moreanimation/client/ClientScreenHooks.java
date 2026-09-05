@@ -1,0 +1,14 @@
+package com.github.JumDa5he.moreanimation.client;
+
+import com.github.JumDa5he.moreanimation.client.gui.ExpressionScreen;
+import net.minecraft.client.Minecraft;
+
+/** Client-only entry points referenced through DistExecutor from common code. */
+public final class ClientScreenHooks {
+    private ClientScreenHooks() {
+    }
+
+    public static void openExpressionScreen(int maidId) {
+        Minecraft.getInstance().setScreen(new ExpressionScreen(maidId));
+    }
+}

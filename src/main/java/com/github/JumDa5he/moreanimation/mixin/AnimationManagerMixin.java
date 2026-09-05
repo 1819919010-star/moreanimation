@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.mixin;
 
 import com.github.JumDa5he.moreanimation.compat.animation.GameLostAnimation;
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.tartaricacid.touhoulittlemaid.api.entity.IMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationManager;
 import com.github.tartaricacid.touhoulittlemaid.client.entity.GeckoMaidEntity;
@@ -23,6 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,18 +36,89 @@ public class AnimationManagerMixin {
     private static final Map<UUID, Long> lipsWatchStart = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> lipsStartTick = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> lipsCooldown = new ConcurrentHashMap<>();
-    @Inject(method = "predicateMisc", at = @At("HEAD"), remap = false, cancellable = true)
-    private void onPredicateMisc(AnimationEvent<GeckoMaidEntity<?>> event, CallbackInfoReturnable<PlayState> cir) {
+    private static final Map<UUID, Long> forcedActionStart = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> interactionActionStart = new ConcurrentHashMap<>();
+    private static final Set<String> PARALLEL_INTERACTIONS = Set.of(
+            "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether");
+
+    /** Expressions and paired interactions are the only custom actions allowed to overlay TLM. */
+    @Inject(method = "predicateParallel", at = @At("HEAD"), remap = false, cancellable = true)
+    private void onPredicateParallel(AnimationEvent<GeckoMaidEntity<?>> event, String animationName,
+                                     CallbackInfoReturnable<PlayState> cir) {
         IMaid maid = event.getAnimatableEntity().getMaid();
-        if (maid == null) {
-            return;
-        }
+        if (maid == null) return;
         EntityMaid entity = (EntityMaid) maid.asEntity();
         UUID uuid = entity.getUUID();
-        // 全局互斥：MAIN 动画播放中，MISC 叠加动画不播（一个动作时不做别的动作）
+        if ("parallel5".equals(animationName)) {
+            String formAnimation = MaidAnimationData.shouldForceFox(entity)
+                    ? "moreanimation_force_fox"
+                    : MaidAnimationData.shouldForceHuman(entity) ? "moreanimation_keep_human" : "";
+            if (!formAnimation.isEmpty()
+                    && play(event, formAnimation, ILoopType.EDefaultLoopTypes.LOOP)) {
+                cir.setReturnValue(PlayState.CONTINUE);
+                cir.cancel();
+            }
+            return;
+        }
+        if ("parallel7".equals(animationName)) {
+            String expression = entity.getPersistentData().getString("moreanimation_expression");
+            if (!expression.isEmpty() && play(event, expression, ILoopType.EDefaultLoopTypes.LOOP)) {
+                cir.setReturnValue(PlayState.CONTINUE);
+                cir.cancel();
+            }
+            return;
+        }
+        if (!"parallel6".equals(animationName)) return;
+        String action = MaidAnimationData.activeAction(entity);
+        if (!PARALLEL_INTERACTIONS.contains(action)) {
+            interactionActionStart.remove(uuid);
+            return;
+        }
+        long start = MaidAnimationData.activeStart(entity);
+        Long oldStart = interactionActionStart.put(uuid, start);
+        if (oldStart == null || oldStart.longValue() != start) event.getController().markNeedsReload();
+        ILoopType loop = ("pet_reaction_hold".equals(action) || "pet_other_head".equals(action))
+                ? ILoopType.EDefaultLoopTypes.LOOP : ILoopType.EDefaultLoopTypes.PLAY_ONCE;
+        if (play(event, action, loop)) {
+            cir.setReturnValue(PlayState.CONTINUE);
+            cir.cancel();
+        }
+    }
+
+    /** Full-body forced actions replace TLM MAIN instead of being blended into it. */
+    @Inject(method = "predicateMain", at = @At("HEAD"), remap = false, cancellable = true)
+    private void onPredicateMain(AnimationEvent<GeckoMaidEntity<?>> event,
+                                 CallbackInfoReturnable<PlayState> cir) {
+        IMaid maid = event.getAnimatableEntity().getMaid();
+        if (maid == null) return;
+        EntityMaid entity = (EntityMaid) maid.asEntity();
+        UUID uuid = entity.getUUID();
+        String action = MaidAnimationData.activeAction(entity);
+        if (action.isEmpty() && entity.getPersistentData().getBoolean("moreanimation_tailpull")) action = "tailpull";
+        if (action.isEmpty() || PARALLEL_INTERACTIONS.contains(action)) {
+            forcedActionStart.remove(uuid);
+            return;
+        }
+        long start = MaidAnimationData.activeStart(entity);
+        Long oldStart = forcedActionStart.put(uuid, start);
+        if (oldStart == null || oldStart.longValue() != start) event.getController().markNeedsReload();
+        ILoopType loop = "tailpull".equals(action)
+                ? ILoopType.EDefaultLoopTypes.LOOP : ILoopType.EDefaultLoopTypes.PLAY_ONCE;
+        if (play(event, action, loop)) {
+            cir.setReturnValue(PlayState.CONTINUE);
+            cir.cancel();
+        }
+    }
+
+    @Inject(method = "predicateMisc", at = @At("HEAD"), remap = false, cancellable = true)
+    private void onPredicateMisc(AnimationEvent<GeckoMaidEntity<?>> event,
+                                 CallbackInfoReturnable<PlayState> cir) {
+        IMaid maid = event.getAnimatableEntity().getMaid();
+        if (maid == null) return;
+        EntityMaid entity = (EntityMaid) maid.asEntity();
+        UUID uuid = entity.getUUID();
         if (GameLostAnimation.isMiscBlocked(uuid)) return;
 
-        // dismember: parallel with daily animations, on misc controller
         boolean tailCut = entity.getPersistentData().getBoolean("moreanimation_tailCut");
         boolean headCut = entity.getPersistentData().getBoolean("moreanimation_headCut");
         if (tailCut || headCut) {
@@ -54,19 +127,6 @@ public class AnimationManagerMixin {
             if (animFile != null && GeckoLibCache.getInstance().getAnimations().get(animFile).animations().containsKey(animName)) {
                 GameLostAnimation.claimMisc(uuid, "misc_dismember");
                 event.getController().setAnimation(new AnimationBuilder().addAnimation(animName, ILoopType.EDefaultLoopTypes.LOOP));
-                cir.setReturnValue(PlayState.CONTINUE);
-                cir.cancel();
-                return;
-            }
-        }
-
-        // 表情动作（GUI 选择，头部表情，MISC 叠加持久播放）
-        String expression = entity.getPersistentData().getString("moreanimation_expression");
-        if (!expression.isEmpty()) {
-            ResourceLocation exprAnimFile = event.getAnimatableEntity().getAnimationFileLocation();
-            if (exprAnimFile != null && GeckoLibCache.getInstance().getAnimations().get(exprAnimFile).animations().containsKey(expression)) {
-                GameLostAnimation.claimMisc(uuid, "misc_expression");
-                event.getController().setAnimation(new AnimationBuilder().addAnimation(expression, ILoopType.EDefaultLoopTypes.LOOP));
                 cir.setReturnValue(PlayState.CONTINUE);
                 cir.cancel();
                 return;
@@ -120,18 +180,6 @@ public class AnimationManagerMixin {
             if (hugAnimFile != null && GeckoLibCache.getInstance().getAnimations().get(hugAnimFile).animations().containsKey("hugtogether")) {
                 GameLostAnimation.claimMisc(uuid, "misc_hug");
                 event.getController().setAnimation(new AnimationBuilder().addAnimation("hugtogether", ILoopType.EDefaultLoopTypes.LOOP));
-                cir.setReturnValue(PlayState.CONTINUE);
-                cir.cancel();
-                return;
-            }
-        }
-
-        // tailpull: maid pulls another maid's tail from behind (server-synced flag)
-        if (entity.getPersistentData().getBoolean("moreanimation_tailpull")) {
-            ResourceLocation pullAnimFile = event.getAnimatableEntity().getAnimationFileLocation();
-            if (pullAnimFile != null && GeckoLibCache.getInstance().getAnimations().get(pullAnimFile).animations().containsKey("tailpull")) {
-                GameLostAnimation.claimMisc(uuid, "misc_tailpull");
-                event.getController().setAnimation(new AnimationBuilder().addAnimation("tailpull", ILoopType.EDefaultLoopTypes.LOOP));
                 cir.setReturnValue(PlayState.CONTINUE);
                 cir.cancel();
                 return;
@@ -292,5 +340,15 @@ public class AnimationManagerMixin {
             if (look.dot(toMaid.normalize()) > 0.95) return true;
         }
         return false;
+    }
+
+    private static boolean play(AnimationEvent<GeckoMaidEntity<?>> event, String animation, ILoopType loop) {
+        ResourceLocation file = event.getAnimatableEntity().getAnimationFileLocation();
+        if (file == null || GeckoLibCache.getInstance().getAnimations().get(file) == null
+                || !GeckoLibCache.getInstance().getAnimations().get(file).animations().containsKey(animation)) {
+            return false;
+        }
+        event.getController().setAnimation(new AnimationBuilder().addAnimation(animation, loop));
+        return true;
     }
 }

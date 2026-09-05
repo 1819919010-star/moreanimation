@@ -106,6 +106,10 @@ processResources {
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
     }
+    from('src/main/resources/tlm_custom_pack/touhou_little_maid-1.0.0/assets/mypack/animation') {
+        include 'unknown.animation.json'
+        into 'assets/moreanimation/animation'
+    }
 }
 
 jar {

@@ -13,8 +13,6 @@
         "AnimationManagerMixin",
         "AnimationProcessorMixin",
         "GeckoMaidEntityMixin",
-        "GeckoModelLoaderMixin",
-        "YsmAnimatableMixin"
+        "GeckoModelLoaderMixin"
     ]
 }
-

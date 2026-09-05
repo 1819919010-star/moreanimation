@@ -1,5 +1,7 @@
 # MoreAnimation × 官方 YSM 2.6.5：单动作验证版
 
+> 2026-09-05 启动修复更新：下文记录的是原 PoC，现已停用其 Mixin 注册及自动事件订阅。LoadTrace 证实官方 YSM `MixinTweaker.<init>` 在配置选择阶段加载目标类，导致 MoreAnimation PREPARE 报 `MixinTargetAlreadyLoadedException`。本次只恢复启动，不启用替代动画入口，也不扩展动作。当前构建不提供 YSM circledance。
+
 当前结果：已在指定项目实现 `circledance` PoC，实际构建成功；尚未通过 Minecraft 客户端视觉验收，因此没有扩展其他动作，也不能宣布全量兼容完成。
 
 ## 项目、备份与回退

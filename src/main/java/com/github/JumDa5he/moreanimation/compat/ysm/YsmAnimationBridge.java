@@ -5,8 +5,6 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fml.ModList;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
@@ -18,8 +16,12 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** Version-pinned PoC. No YSM classes occur in JVM descriptors or imports. */
-@Mod.EventBusSubscriber(modid = "moreanimation", value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+/**
+ * Dormant PoC: not automatically registered while the startup gate is closed.
+ * Official YSM's MixinTweaker loads the old mixin target during config selection,
+ * before Mixin PREPARE. Do not re-enable YsmAnimatableMixin on that target.
+ * No YSM classes occur in JVM descriptors or imports.
+ */
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";

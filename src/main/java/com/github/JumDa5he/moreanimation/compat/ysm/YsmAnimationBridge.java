@@ -4,7 +4,9 @@ import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
@@ -17,11 +19,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
- * Dormant PoC: not automatically registered while the startup gate is closed.
- * Official YSM's MixinTweaker loads the old mixin target during config selection,
- * before Mixin PREPARE. Do not re-enable YsmAnimatableMixin on that target.
+ * Version-pinned runtime bridge. Official YSM's MixinTweaker loads the old
+ * YsmAnimatableMixin target during config selection, so the active hook lives
+ * in the later-loaded YSM renderer instead.
  * No YSM classes occur in JVM descriptors or imports.
  */
+@Mod.EventBusSubscriber(modid = "moreanimation", value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";
@@ -87,8 +90,8 @@ public final class YsmAnimationBridge {
         } catch (ReflectiveOperationException | RuntimeException e) { fail(e); }
     }
 
-    public static void after(Object animatable, float partialTick, Object event) {
-        if (event == null || !initialize()) return;
+    public static void after(Object animatable, float partialTick) {
+        if (!initialize()) return;
         try {
             if (!(entity.invoke(animatable) instanceof EntityMaid maid)
                     || !"circledance".equals(MaidAnimationData.activeAction(maid))) return;

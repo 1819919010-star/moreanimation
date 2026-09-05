@@ -1,8 +1,8 @@
 # MoreAnimation × 官方 YSM 2.6.5：单动作验证版
 
-> 2026-09-05 启动修复更新：下文记录的是原 PoC，现已停用其 Mixin 注册及自动事件订阅。LoadTrace 证实官方 YSM `MixinTweaker.<init>` 在配置选择阶段加载目标类，导致 MoreAnimation PREPARE 报 `MixinTargetAlreadyLoadedException`。本次只恢复启动，不启用替代动画入口，也不扩展动作。当前构建不提供 YSM circledance。
+> 2026-09-05 renderer hook 更新：原 `YsmAnimatableMixin` 已删除。LoadTrace 证实官方 YSM `MixinTweaker.<init>` 会在配置选择阶段提前加载其目标类；替代方案改为挂到稍后加载的官方 renderer 父类，在官方姿态计算前恢复、计算后写入 `circledance`，再由官方 renderer 正常绘制。
 
-当前结果：已在指定项目实现 `circledance` PoC，实际构建成功；尚未通过 Minecraft 客户端视觉验收，因此没有扩展其他动作，也不能宣布全量兼容完成。
+当前结果：新 renderer Mixin 已在官方 YSM 2.6.5 的真实启动中成功应用，Minecraft 完成资源加载且没有再次出现 `MixinTargetAlreadyLoadedException`。尚未通过游戏内视觉验收，因此没有扩展其他动作，也不能宣布单动作 PoC 完成。
 
 ## 项目、备份与回退
 
@@ -22,22 +22,23 @@
   → AnimationSyncPacket
   → MaidAnimationData.clientStart
   → MaidAnimationData.activeAction / activeStart
-  → YsmAnimatableMixin
+  → YsmRendererMixin（官方姿态计算调用前/后）
   → YsmAnimationBridge.after
   → CircleDanceClip 读取现有 unknown.animation.json 的 circledance
   → 官方 YSM 每实体模型的骨骼缓冲区
   → 官方 YSM 原有渲染器
 ```
 
-实际挂钩是官方 JAR 中：
+实际挂钩是官方 JAR 中稍后加载的 renderer 父类：
 
 ```text
-com.elfmcys.yesstevemodel.o0000OoOooO0oo0o0oooo0Oo
-  o0OOooo0o0OO00OoOOOo0o0O(float, boolean)
-  返回 OO00O0o0OooOOOo00OO00o00
+com.elfmcys.yesstevemodel.OOoo0o0oO000ooO0Oo00OoOo
+  Oo0Oo0o00O00Oo0OOoOOoooo(...)
+  → animatable.o0OOooo0o0OO00OoOOOo0o0O(float)
+  → 官方模型绘制
 ```
 
-该方法先计算动画，再返回供渲染器使用的事件。HEAD 恢复上次写入前的骨骼分量，RETURN 采样并应用本次动作。实际方法、返回描述符及骨骼 getter/setter 均用 JDK `javap` 核对过提供的 JAR。
+Mixin 在该姿态计算调用前恢复上帧写入，在调用返回后采样并应用本次动作，此时模型尚未绘制。实际方法、调用描述符及骨骼 getter/setter 均用 JDK `javap` 核对过提供的 JAR。定向 LoadTrace 显示 renderer 父类在 Forge 构造客户端 Mod 时才首次定义，Mixin 已在真实启动日志中成功应用。
 
 实体访问：`OO00OOOOo0Ooo0oo0o0Oo0OO()`；当前模型：`OOOoOO000000o0o0oOooo0o0()`。模型类 `OOOO0O0O000O000000oOOO0o` 的 `O00OOOooOoooOoo0o0o0oO0O()` 提供骨骼映射。接口 `Oo0o00oOOo0OO000000O0oO0` 的实现 `OO0oo000o00O0O0oo00oO000` 直接读写每实例 float 缓冲区。
 
@@ -65,19 +66,19 @@ SHA-256：`25B5E902B96F4C298690208F8B433CBC31737C23F87590354DBD86F00207BC8F`。
 - 保存原始骨骼分量的表按 animatable 对象隔离，使用弱键；不会将动作状态放在共享模型资源里。
 - 动作结束或切换到其他动作时，下一次姿态计算先恢复原值，再交回 YSM。其他动作目前不做兼容。
 - 资源重载清除动画缓存。未知格式、Molang、复杂关键帧会拒绝并记录日志，不静默近似。
-- 只启用已核对版本；反射失败会记录错误并停止兼容写入。可选 `@Pseudo` Mixin 在没有目标类时跳过。
+- 只启用已核对版本；反射失败会记录错误并停止兼容写入。可选 `@Pseudo` renderer Mixin 在没有目标类时跳过。
 
 ## 文件清单
 
 修改：
 
-1. `src/main/resources/mixins.moreanimation.json`：增加可选客户端 Mixin。
+1. `src/main/resources/mixins.moreanimation.json`：注册安全的 renderer 客户端 Mixin，不再注册旧 animatable Mixin。
 
 新增：
 
 1. `src/main/java/com/github/JumDa5he/moreanimation/compat/ysm/CircleDanceClip.java`
 2. `src/main/java/com/github/JumDa5he/moreanimation/compat/ysm/YsmAnimationBridge.java`
-3. `src/main/java/com/github/JumDa5he/moreanimation/mixin/YsmAnimatableMixin.java`
+3. `src/main/java/com/github/JumDa5he/moreanimation/mixin/YsmRendererMixin.java`
 4. `scripts/ysm/CircleDanceClipCheck.java`
 5. `scripts/ysm/OfficialBoneCheck.java`
 6. `docs/YSM-COMPAT-POC.md`：本报告。
@@ -90,7 +91,8 @@ SHA-256：`25B5E902B96F4C298690208F8B433CBC31737C23F87590354DBD86F00207BC8F`。
 - Gradle 没有现成测试源，`test NO-SOURCE`；不能把这一项当作运行时测试。
 - 独立采样检查：读取项目真实动画，验证插值、循环、常量通道、完整转圈、拒绝未支持的 Molang，全部通过。
 - 官方骨骼检查：在哈希相同的官方 JAR 上实例化真实骨骼类，验证九个缓冲区读写分量、恢复原值和两个实例的缓冲区隔离，全部通过。
-- 以上检查**不覆盖** Forge 启动、Mixin 实际应用、游戏渲染、多客户端同步或视觉质量。
+- 官方 YSM 2.6.5 隔离实例实际启动：`YsmRendererMixin` 成功应用，资源加载完成，没有 Mixin PREPARE 崩溃。
+- 以上检查仍**不覆盖**游戏内 `circledance` 的肉眼效果、多客户端同步或视觉质量。
 
 ## 唯一推荐的下一步：游戏内 circledance 门槛验收
 

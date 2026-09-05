@@ -28,6 +28,7 @@ import java.util.*;
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";
+    private static final Set<String> SUPPORTED_ACTIONS = Set.of("circledance", "maid_bow", "come2");
     private static final String[] COMPONENTS = {
             "Oo0Oo0o00O00Oo0OOoOOoooo", "o0OOooo0o0OO00OoOOOo0o0O", "O00OOOooOoooOoo0o0o0oO0O",
             "oOOOo0OOO0ooooo0O00OO0o0", "OOOOo0O0oO0OOo0O0O0Oo0O0", "Ooooo0oooO0oooOOOoO0000O",
@@ -37,7 +38,7 @@ public final class YsmAnimationBridge {
     private static final Method[] GET = new Method[9], SET = new Method[9];
     private static boolean initialized, disabled, announced;
     private static Object resourceManager;
-    private static CircleDanceClip clip;
+    private static Map<String, YsmAnimationClip> clips = Map.of();
     private record Saved(Object bone, int component, float value) {}
 
     private YsmAnimationBridge() {}
@@ -45,7 +46,7 @@ public final class YsmAnimationBridge {
     @SubscribeEvent
     public static void registerReload(RegisterClientReloadListenersEvent event) {
         event.registerReloadListener((ResourceManagerReloadListener) manager -> {
-            clip = null;
+            clips = Map.of();
             resourceManager = null;
         });
     }
@@ -58,7 +59,7 @@ public final class YsmAnimationBridge {
                     .map(c -> c.getModInfo().getVersion().toString()).orElse("");
             if (!"2.6.5-forge+mc1.20.1".equals(version)) {
                 disabled = true;
-                LOG.warn("YSM circledance PoC disabled for unverified version {}", version);
+                LOG.warn("YSM animation bridge disabled for unverified version {}", version);
                 return false;
             }
             Class<?> base = Class.forName(PACKAGE + "o0000OoOooO0oo0o0oooo0Oo");
@@ -93,16 +94,19 @@ public final class YsmAnimationBridge {
     public static void after(Object animatable, float partialTick) {
         if (!initialize()) return;
         try {
-            if (!(entity.invoke(animatable) instanceof EntityMaid maid)
-                    || !"circledance".equals(MaidAnimationData.activeAction(maid))) return;
+            if (!(entity.invoke(animatable) instanceof EntityMaid maid)) return;
+            String action = MaidAnimationData.activeAction(maid);
+            if (!SUPPORTED_ACTIONS.contains(action)) return;
             var resources = Minecraft.getInstance().getResourceManager();
-            if (clip == null || resourceManager != resources) {
+            if (clips.isEmpty() || resourceManager != resources) {
                 try (var reader = new InputStreamReader(resources.open(new ResourceLocation(
                         "moreanimation", "animation/unknown.animation.json")), StandardCharsets.UTF_8)) {
-                    clip = CircleDanceClip.read(reader);
+                    clips = YsmAnimationClip.read(reader, SUPPORTED_ACTIONS);
                     resourceManager = resources;
                 }
             }
+            YsmAnimationClip clip = clips.get(action);
+            if (clip == null) return;
             Object runtime = model.invoke(animatable);
             if (runtime == null) return;
             Map<String, Object> byName = new HashMap<>();
@@ -130,8 +134,8 @@ public final class YsmAnimationBridge {
             }
             if (!announced && !saved.isEmpty()) {
                 announced = true;
-                LOG.info("YSM circledance PoC applied {} bone components to maid {}; visual verification still required",
-                        saved.size(), maid.getUUID());
+                LOG.info("YSM animation bridge applied action {} ({} bone components) to maid {}",
+                        action, saved.size(), maid.getUUID());
             }
         } catch (Exception | LinkageError e) {
             before(animatable);
@@ -140,7 +144,7 @@ public final class YsmAnimationBridge {
     }
 
     private static void fail(Throwable e) {
-        if (!disabled) LOG.error("Disabling YSM circledance PoC; retaining original YSM rendering", e);
+        if (!disabled) LOG.error("Disabling YSM animation bridge; retaining original YSM rendering", e);
         disabled = true;
     }
 }

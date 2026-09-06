@@ -76,7 +76,14 @@ omission is logged once when resources load. No other one of the 38 compatible a
 numeric bridge deliberately rejects. It remains on the original Gecko path and is the only selected action
 not yet applied to arbitrary official YSM skins.
 
-The terminal's eight persistent expression choices are expression overlays, not actions, and keep
-their existing `moreanimation_expression`/parallel-controller path. Wine Fox form visibility and
-dismemberment entries are model-specific overlays rather than common MoreAnimation actions; they
-are not applied to arbitrary YSM skins.
+The terminal's eight persistent expression choices are expression overlays, not actions. They keep
+their existing `moreanimation_expression` state and Gecko parallel-controller path. The YSM bridge
+now consumes that same state through an independent facial overlay, so the selected expression can
+remain active while a main body action plays. The overlay includes only the expression clip's head,
+face, eye, mouth and ear bones; embedded arm gesture channels do not replace the main action.
+
+The eight choices currently present in the terminal source are `veryangry`, `wuyu`, `sosad`,
+`provoke`, `lips`, `sneer`, `dizziness`, and `kuang`. `dizziness` uses numeric Catmull-Rom keyframes,
+which the shared parser now supports. Wine Fox form visibility and dismemberment entries remain
+model-specific overlays rather than common MoreAnimation actions; they are not applied to arbitrary
+YSM skins.

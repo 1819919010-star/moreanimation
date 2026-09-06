@@ -17,18 +17,37 @@ import java.util.TreeMap;
 
 /** Numeric Bedrock animation clips consumed by the version-pinned YSM renderer bridge. */
 public final class YsmAnimationClip {
-    public record Channel(String bone, int offset, NavigableMap<Double, float[]> keys) {
+    private record Keyframe(float[] value, boolean catmullRom) {}
+
+    public record Channel(String bone, int offset, NavigableMap<Double, Keyframe> keys) {
         public float[] sample(double seconds) {
             var left = keys.floorEntry(seconds);
             var right = keys.ceilingEntry(seconds);
-            if (left == null) return keys.firstEntry().getValue().clone();
-            if (right == null) return keys.lastEntry().getValue().clone();
-            if (left.getKey().equals(right.getKey())) return left.getValue().clone();
+            if (left == null) return keys.firstEntry().getValue().value().clone();
+            if (right == null) return keys.lastEntry().getValue().value().clone();
+            if (left.getKey().equals(right.getKey())) return left.getValue().value().clone();
             double fraction = (seconds - left.getKey()) / (right.getKey() - left.getKey());
+            float[] leftValue = left.getValue().value();
+            float[] rightValue = right.getValue().value();
             float[] result = new float[3];
+            if (left.getValue().catmullRom() || right.getValue().catmullRom()) {
+                var before = keys.lowerEntry(left.getKey());
+                var after = keys.higherEntry(right.getKey());
+                float[] p0 = before == null ? leftValue : before.getValue().value();
+                float[] p3 = after == null ? rightValue : after.getValue().value();
+                double squared = fraction * fraction;
+                double cubed = squared * fraction;
+                for (int axis = 0; axis < 3; axis++) {
+                    result[axis] = (float) (0.5 * ((2 * leftValue[axis])
+                            + (-p0[axis] + rightValue[axis]) * fraction
+                            + (2 * p0[axis] - 5 * leftValue[axis] + 4 * rightValue[axis] - p3[axis]) * squared
+                            + (-p0[axis] + 3 * leftValue[axis] - 3 * rightValue[axis] + p3[axis]) * cubed));
+                }
+                return result;
+            }
             for (int axis = 0; axis < 3; axis++) {
-                result[axis] = (float) (left.getValue()[axis]
-                        + fraction * (right.getValue()[axis] - left.getValue()[axis]));
+                result[axis] = (float) (leftValue[axis]
+                        + fraction * (rightValue[axis] - leftValue[axis]));
             }
             return result;
         }
@@ -92,7 +111,7 @@ public final class YsmAnimationClip {
                     default -> throw new IllegalArgumentException(
                             "Unsupported " + action + " channel: " + entry.getKey());
                 };
-                NavigableMap<Double, float[]> keys = new TreeMap<>();
+                NavigableMap<Double, Keyframe> keys = new TreeMap<>();
                 if (entry.getValue().isJsonObject()) {
                     for (var frame : entry.getValue().getAsJsonObject().entrySet()) {
                         double time = Double.parseDouble(frame.getKey());
@@ -101,10 +120,10 @@ public final class YsmAnimationClip {
                             throw new IllegalArgumentException("Invalid " + action + " frame time");
                         }
                         maxFrameTime = Math.max(maxFrameTime, time);
-                        keys.put(time, vector(action, frame.getValue()));
+                        keys.put(time, keyframe(action, frame.getValue()));
                     }
                 } else {
-                    keys.put(0.0, vector(action, entry.getValue()));
+                    keys.put(0.0, keyframe(action, entry.getValue()));
                 }
                 if (keys.isEmpty()) throw new IllegalArgumentException("Empty " + action + " channel");
                 channels.add(new Channel(bone.getKey(), offset, keys));
@@ -116,6 +135,21 @@ public final class YsmAnimationClip {
 
     public double time(double seconds) {
         return loop ? Math.max(0, seconds) % length : Math.min(length, Math.max(0, seconds));
+    }
+
+    private static Keyframe keyframe(String action, JsonElement element) {
+        if (!element.isJsonObject()) return new Keyframe(vector(action, element), false);
+        JsonObject object = element.getAsJsonObject();
+        if (!object.has("post") || !object.has("lerp_mode")
+                || !"catmullrom".equals(object.get("lerp_mode").getAsString())) {
+            throw new IllegalArgumentException("Unsupported complex keyframe in " + action);
+        }
+        for (String key : object.keySet()) {
+            if (!Set.of("post", "lerp_mode").contains(key)) {
+                throw new IllegalArgumentException("Unsupported complex keyframe property in " + action + ": " + key);
+            }
+        }
+        return new Keyframe(vector(action, object.get("post")), true);
     }
 
     private static float[] vector(String action, JsonElement element) {

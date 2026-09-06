@@ -4,6 +4,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -15,6 +16,8 @@ public final class YsmAnimationClipCheck {
             "pet_other_head_raise", "hugtogether", "morebeg", "catchbyhook", "hurt", "kowtow",
             "drowning", "pray", "watchtombstone", "CLEANTAIL", "game_lost2", "tailcircle", "tailpull",
             "ear_pull_left", "ear_pull_right", "hang", "dance1", "lips");
+    private static final Set<String> EXPRESSIONS = Set.of(
+            "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang");
     private static void equal(double actual, double expected) {
         if (Math.abs(actual - expected) > 0.0001) throw new AssertionError(actual + " != " + expected);
     }
@@ -25,11 +28,13 @@ public final class YsmAnimationClipCheck {
     }
 
     public static void main(String[] args) throws Exception {
+        Set<String> requested = new HashSet<>(ACTIONS);
+        requested.addAll(EXPRESSIONS);
         Map<String, YsmAnimationClip> clips;
         try (Reader reader = Files.newBufferedReader(Path.of(args[0]))) {
-            clips = YsmAnimationClip.read(reader, ACTIONS);
+            clips = YsmAnimationClip.read(reader, requested);
         }
-        if (!clips.keySet().equals(ACTIONS)) throw new AssertionError("Action registry mismatch");
+        if (!clips.keySet().equals(requested)) throw new AssertionError("Animation registry mismatch");
 
         YsmAnimationClip dance = clips.get("circledance");
         equal(dance.length, 4);
@@ -53,6 +58,9 @@ public final class YsmAnimationClipCheck {
         equal(ha.time(1.25), 0.25);
         equal(channel(clips.get("injured_kneel"), "RightEyePublic", 6).sample(0)[0], 0);
 
+        YsmAnimationClip dizziness = clips.get("dizziness");
+        equal(channel(dizziness, "Head", 0).sample(0.25)[0], 5.42918125);
+
         String bad = "{\"animations\":{\"bad\":{\"animation_length\":1,\"bones\":"
                 + "{\"Head\":{\"rotation\":[\"query.foo\",0,0]}}}}}";
         try {
@@ -60,7 +68,10 @@ public final class YsmAnimationClipCheck {
             throw new AssertionError("Molang accepted silently");
         } catch (IllegalArgumentException expected) {
         }
-        System.out.println("PASS: all " + clips.size()
-                + " code-selected common animations parsed; numeric interpolation, scalar scale and inferred length verified");
+        for (String expression : EXPRESSIONS) {
+            if (clips.get(expression).channels.isEmpty()) throw new AssertionError("Empty expression: " + expression);
+        }
+        System.out.println("PASS: all " + ACTIONS.size() + " actions and " + EXPRESSIONS.size()
+                + " terminal expressions parsed; numeric interpolation, scalar scale and inferred length verified");
     }
 }

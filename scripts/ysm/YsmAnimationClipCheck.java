@@ -8,6 +8,13 @@ import java.util.Map;
 import java.util.Set;
 
 public final class YsmAnimationClipCheck {
+    private static final Set<String> ACTIONS = Set.of(
+            "circledance", "!??!", "come", "come2", "ha", "tastetail", "eattail", "sleep2", "situp",
+            "maid_bow", "refuse", "injured_kneel", "death_fall", "death_drown", "death_burn",
+            "death_ranged", "fear_retreat_fall", "pet_reaction", "pet_reaction_hold", "pet_other_head",
+            "pet_other_head_raise", "hugtogether", "morebeg", "catchbyhook", "hurt", "kowtow",
+            "drowning", "pray", "watchtombstone", "CLEANTAIL", "game_lost2", "tailcircle", "tailpull",
+            "ear_pull_left", "ear_pull_right", "hang", "dance1", "lips");
     private static void equal(double actual, double expected) {
         if (Math.abs(actual - expected) > 0.0001) throw new AssertionError(actual + " != " + expected);
     }
@@ -20,8 +27,9 @@ public final class YsmAnimationClipCheck {
     public static void main(String[] args) throws Exception {
         Map<String, YsmAnimationClip> clips;
         try (Reader reader = Files.newBufferedReader(Path.of(args[0]))) {
-            clips = YsmAnimationClip.read(reader, Set.of("circledance", "maid_bow", "come2"));
+            clips = YsmAnimationClip.read(reader, ACTIONS);
         }
+        if (!clips.keySet().equals(ACTIONS)) throw new AssertionError("Action registry mismatch");
 
         YsmAnimationClip dance = clips.get("circledance");
         equal(dance.length, 4);
@@ -40,6 +48,11 @@ public final class YsmAnimationClipCheck {
         equal(come.time(0.625), 0.125);
         equal(channel(come, "Tail", 0).sample(0.125)[1], 0);
 
+        YsmAnimationClip ha = clips.get("ha");
+        equal(ha.length, 1);
+        equal(ha.time(1.25), 0.25);
+        equal(channel(clips.get("injured_kneel"), "RightEyePublic", 6).sample(0)[0], 0);
+
         String bad = "{\"animations\":{\"bad\":{\"animation_length\":1,\"bones\":"
                 + "{\"Head\":{\"rotation\":[\"query.foo\",0,0]}}}}}";
         try {
@@ -47,6 +60,7 @@ public final class YsmAnimationClipCheck {
             throw new AssertionError("Molang accepted silently");
         } catch (IllegalArgumentException expected) {
         }
-        System.out.println("PASS: circledance, maid_bow and come2 parsed and sampled safely");
+        System.out.println("PASS: all " + clips.size()
+                + " code-selected common animations parsed; numeric interpolation, scalar scale and inferred length verified");
     }
 }

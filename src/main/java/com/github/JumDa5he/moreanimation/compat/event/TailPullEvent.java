@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.network.CleanTailSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.network.TailPullSyncPacket;
@@ -65,6 +66,8 @@ public class TailPullEvent {
         // 播放 tailpull 动画
         PENDING_ANIMS.put(maid.getUUID(), now + PULL_ANIM_TICKS);
         COOLDOWN_UNTIL.put(maid.getUUID(), now + COOLDOWN_TICKS);
+        MaidAnimationData.start(maid, "tailpull", (int) PULL_ANIM_TICKS,
+                MaidAnimationData.PRIORITY_INTERACTION, false);
         sendPullState(level, maid, true);
 
         // 累计拉 5 次后触发一次 cleantail
@@ -72,6 +75,8 @@ public class TailPullEvent {
         if (count >= PULLS_FOR_CLEANTAIL) {
             PULL_COUNT.remove(maid.getUUID());
             PENDING_CLEANTAIL.put(maid.getUUID(), now + CLEANTAIL_ANIM_TICKS);
+            MaidAnimationData.start(maid, "CLEANTAIL", (int) CLEANTAIL_ANIM_TICKS,
+                    MaidAnimationData.PRIORITY_INTERACTION, false);
             sendCleanTailState(level, maid, true);
         }
     }

@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.network.HuggingSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -169,6 +170,12 @@ public class HugAnimationEvent {
         }
         HUG_SENT_STATE.put(maidUuid, hugging);
         if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
+            if (hugging) {
+                MaidAnimationData.start(maid, "hugtogether", (int) HUG_ANIM_TICKS,
+                        MaidAnimationData.PRIORITY_INTERACTION, true);
+            } else if ("hugtogether".equals(MaidAnimationData.activeAction(maid))) {
+                MaidAnimationData.stop(maid);
+            }
             MoreAnimationNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> maid),
                     new HuggingSyncPacket(maid.getId(), hugging));
         }

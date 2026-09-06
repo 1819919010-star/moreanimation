@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.network.KowtowSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -34,6 +35,10 @@ public class KowtowEvent {
 
         ServerLevel level = (ServerLevel) maid.level();
         PENDING_ANIMS.put(maid.getUUID(), level.getGameTime() + KOWTOW_ANIM_TICKS);
+        if (MaidAnimationData.activePriority(maid) < MaidAnimationData.PRIORITY_INTERACTION) {
+            MaidAnimationData.start(maid, "kowtow", (int) KOWTOW_ANIM_TICKS,
+                    MaidAnimationData.PRIORITY_INTERACTION, true);
+        }
         sendKowtowState(level, maid, true);
     }
 

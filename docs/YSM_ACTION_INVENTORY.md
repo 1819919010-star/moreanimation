@@ -1,57 +1,78 @@
-# MoreAnimation action inventory for the YSM bridge
+# MoreAnimation action inventory for official YSM
 
-This inventory is based on Java trigger paths, rather than every entry present in
-`unknown.animation.json`. Durations are the action lifetime used by the mod. The
-animation clip may be shorter and loop within that lifetime.
+The inventory follows Java trigger paths. Entries that merely exist in an animation JSON but are
+never selected by project code are not counted as actions.
 
-## Random actions and terminal actions
+## Result
 
-| Action | Source/state | Trigger | Clip loop | Lifetime | Movement lock | YSM bridge |
-|---|---|---|---|---:|---|---|
-| `circledance` | standing pool | random scheduler + terminal | yes | 90 ticks | no | verified in game |
-| `!??!` | standing pool | random scheduler + terminal | no | 30 ticks | no | pending |
-| `come2` | sitting pool | random scheduler + terminal | yes | 100 ticks | no | first expansion build |
-| `ha` | sitting pool | random scheduler + terminal | yes | 120 ticks | no | pending |
-| `tastetail` | sitting pool | random scheduler + terminal | yes | 145 ticks | no | pending |
-| `eattail` | `tastetail` transition after 45 ticks | automatic transition | yes | 100 ticks | no | pending |
-| `come` | sleeping pool | random scheduler + terminal | yes | 200 ticks | no | pending |
-| `sleep2` | sleeping pool | random scheduler + terminal | no | 130 ticks | no | pending |
-| `situp` | sleeping pool | random scheduler + terminal | no | 400 ticks | no | pending |
+- 38 action names are selected by current Java code and have common bone animation data in
+  `unknown.animation.json`.
+- All 38 are registered in the YSM bridge and parse successfully.
+- All 38 now reach both renderers through `MaidAnimationData.activeAction(maid)`.
+- The bridge remains a soft YSM 2.6.5 integration. No YSM class appears in a common event or packet
+  descriptor.
 
-The current random scheduler stores its winner in `GameLostAnimation.SCHEDULED`
-and the ordinary TLM animation mixins read that state directly. It does **not**
-call `MaidAnimationData.start`, so it does not currently produce an
-`activeAction`. This is the reason random/passive `circledance` did not reach the
-YSM bridge in the earlier game test. The later passive-integration stage must
-route this existing scheduler result through `MaidAnimationData`; it must not add
-a YSM timer or probability system.
+## Terminal and random pools
 
-## Event and interaction actions
+| State | Actions | Trigger path |
+|---|---|---|
+| Standing | `circledance`, `!??!` | terminal or configured random scheduler |
+| Sitting | `come2`, `ha`, `tastetail` → `eattail` | terminal, configured random scheduler, or legacy held-item condition |
+| Sleeping | `come`, `sleep2`, `situp` | terminal, configured random scheduler, or legacy held-item condition |
+| Other terminal action | `injured_kneel` | terminal or damage threshold |
 
-| Action | Source | Clip loop | Lifetime | Movement lock | YSM bridge |
-|---|---|---|---:|---|---|
-| `maid_bow` | owner enters bow range | no | 48 ticks | yes | first expansion build |
-| `refuse` | owner approaches with blocked food | no | 20 ticks | yes | pending |
-| `injured_kneel` | damage threshold or terminal | hold last frame | 60 ticks | yes | pending |
-| `death_fall` | fall death | hold last frame | 28 ticks | yes | pending |
-| `death_drown` | drowning death | hold last frame | 72 ticks | yes | pending |
-| `death_burn` | fire death | hold last frame | 56 ticks | yes | pending |
-| `death_ranged` | ranged death | hold last frame | 32 ticks | yes | pending |
-| `fear_retreat_fall` | HandItem attack | hold last frame | 50 ticks | yes | pending |
-| `pet_reaction` | pet target/reaction | no | 64 ticks | yes | pending |
-| `pet_reaction_hold` | held pet reaction | yes | 30 ticks or session lifetime | yes | pending |
-| `pet_other_head` | pet another entity | yes | 78 ticks | yes | pending |
-| `pet_other_head_raise` | raised pet interaction | no | 16 ticks | yes | pending |
-| `hugtogether` | hug interaction, both maids when applicable | no | 94 ticks | yes | pending |
+The random scheduler now publishes its selected action through `MaidAnimationData.start`. This is
+the passive-path change that was missing when random `circledance` previously failed to appear on
+YSM models. Probability, interval, enabled pools and state checks remain the existing MoreAnimation
+rules.
 
-All event and interaction actions above already call `MaidAnimationData.start`
-and therefore already converge on `MaidAnimationData.activeAction`. They need no
-YSM-specific triggering code.
+## Existing MaidAnimationData event actions
 
-## First expansion gate
+`maid_bow`, `refuse`, `injured_kneel`, `death_fall`, `death_drown`, `death_burn`, `death_ranged`,
+`fear_retreat_fall`, `pet_reaction`, `pet_reaction_hold`, `pet_other_head`,
+`pet_other_head_raise`, and `hugtogether`.
 
-The first expansion build deliberately contains three registered YSM clips:
-`circledance`, `maid_bow`, and `come2`. `maid_bow` covers a one-shot, locked
-interaction action. `come2` covers a short looping clip with a large optional
-tail-bone set. Missing bones remain safe because the bridge applies only channels
-whose bone names exist in the current YSM model.
+These already used `MaidAnimationData.start`; the work here registers all of their clips in the
+general YSM animation registry.
+
+## Legacy conditions migrated to MaidAnimationData
+
+| Actions | Existing condition retained |
+|---|---|
+| `come`, `come2`, `sleep2`, `tastetail`, `eattail` | owner held item and maid pose |
+| `weidu` | sitting inside the berry-bush arrangement |
+| `morebeg` | health below 30 percent |
+| `catchbyhook` | fishing hook attached |
+| `hurt` | five player hits within the existing attack window |
+| `kowtow` | projectile hit |
+| `drowning` | in water with no air |
+| `pray` | shrine event |
+| `watchtombstone` | nearby tombstone and existing cooldown |
+| `tailpull`, `CLEANTAIL` | tail-pull event and accumulated pull count |
+| `ear_pull_left`, `ear_pull_right` | ear click/hold event and chosen side |
+| `hang`, `game_lost2` | leashed off ground/on ground |
+| `tailcircle` | cake within two blocks |
+| `dance1` | standing while owner holds an iron nugget |
+| `circledance`, `!??!` | owner-held sugar/TNT as well as random pool |
+| `lips` | player watches while holding food for the existing delay |
+
+These conditions are evaluated by common MoreAnimation server code. They call the same
+`MaidAnimationData.start/stop` methods as terminal and interaction actions, so YSM has no timer,
+probability, cooldown, priority or packet implementation of its own.
+
+## Animation data and bones
+
+The shared parser supports rotation, position, scale, numeric keyframes, scalar scale values,
+missing `animation_length`, looping, one-shot/held-last-frame clips, and multiple bones. Bone names
+match exactly first and then case-insensitively; the verified `MRoot` to `MAllBody` fallback remains.
+Bones absent from a particular YSM skin are skipped per model and reported once at action start in
+debug logging.
+
+`CLEANTAIL` contains a `timeline` assignment (`v.cleantial`) in addition to its bone animation. YSM
+receives all `CLEANTAIL` bone transforms, but the bridge does not execute that model variable. The
+omission is logged once when resources load. No other one of the 38 actions has an omitted feature.
+
+The terminal's eight persistent expression choices are expression overlays, not actions, and keep
+their existing `moreanimation_expression`/parallel-controller path. Wine Fox form visibility and
+dismemberment entries are model-specific overlays rather than common MoreAnimation actions; they
+are not applied to arbitrary YSM skins.

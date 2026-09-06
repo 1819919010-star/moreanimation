@@ -28,18 +28,27 @@ import java.util.*;
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";
-    private static final Set<String> SUPPORTED_ACTIONS = Set.of("circledance", "maid_bow", "come2");
+    /** Every common animation that current Java code can actually select. */
+    private static final Set<String> SUPPORTED_ACTIONS = Set.of(
+            "circledance", "!??!", "come", "come2", "ha", "tastetail", "eattail", "sleep2", "situp",
+            "maid_bow", "refuse", "injured_kneel", "death_fall", "death_drown", "death_burn",
+            "death_ranged", "fear_retreat_fall", "pet_reaction", "pet_reaction_hold", "pet_other_head",
+            "pet_other_head_raise", "hugtogether", "morebeg", "catchbyhook", "hurt", "kowtow",
+            "drowning", "pray", "watchtombstone", "CLEANTAIL", "game_lost2", "tailcircle", "tailpull",
+            "ear_pull_left", "ear_pull_right", "hang", "dance1", "lips");
     private static final String[] COMPONENTS = {
             "Oo0Oo0o00O00Oo0OOoOOoooo", "o0OOooo0o0OO00OoOOOo0o0O", "O00OOOooOoooOoo0o0o0oO0O",
             "oOOOo0OOO0ooooo0O00OO0o0", "OOOOo0O0oO0OOo0O0O0Oo0O0", "Ooooo0oooO0oooOOOoO0000O",
             "oo0OoO00oOoo000O0000o0oo", "oooooooOOoOOoO00OooOo00O", "Oo00o0OooOOo0ooOoo0oO0o0"};
     private static final Map<Object, List<Saved>> SAVED = new WeakHashMap<>();
+    private static final Map<Object, Playing> PLAYING = new WeakHashMap<>();
     private static Method entity, model, bones, name, bind;
     private static final Method[] GET = new Method[9], SET = new Method[9];
-    private static boolean initialized, disabled, announced;
+    private static boolean initialized, disabled;
     private static Object resourceManager;
     private static Map<String, YsmAnimationClip> clips = Map.of();
     private record Saved(Object bone, int component, float value) {}
+    private record Playing(String action, long start) {}
 
     private YsmAnimationBridge() {}
 
@@ -48,6 +57,7 @@ public final class YsmAnimationBridge {
         event.registerReloadListener((ResourceManagerReloadListener) manager -> {
             clips = Map.of();
             resourceManager = null;
+            PLAYING.clear();
         });
     }
 
@@ -96,32 +106,71 @@ public final class YsmAnimationBridge {
         try {
             if (!(entity.invoke(animatable) instanceof EntityMaid maid)) return;
             String action = MaidAnimationData.activeAction(maid);
-            if (!SUPPORTED_ACTIONS.contains(action)) return;
+            Playing previous = PLAYING.get(animatable);
+            if (action.isEmpty()) {
+                if (previous != null) {
+                    PLAYING.remove(animatable);
+                    LOG.debug("YSM animation ended action {} for maid {}", previous.action(), maid.getUUID());
+                }
+                return;
+            }
+            if (!SUPPORTED_ACTIONS.contains(action)) {
+                if (previous == null || !previous.action().equals(action)) {
+                    PLAYING.put(animatable, new Playing(action, MaidAnimationData.activeStart(maid)));
+                    LOG.warn("YSM bridge has no common animation data for action {} on maid {}",
+                            action, maid.getUUID());
+                }
+                return;
+            }
             var resources = Minecraft.getInstance().getResourceManager();
             if (clips.isEmpty() || resourceManager != resources) {
                 try (var reader = new InputStreamReader(resources.open(new ResourceLocation(
                         "moreanimation", "animation/unknown.animation.json")), StandardCharsets.UTF_8)) {
                     clips = YsmAnimationClip.read(reader, SUPPORTED_ACTIONS);
                     resourceManager = resources;
+                    clips.forEach((name, loaded) -> {
+                        if (!loaded.omittedFeatures.isEmpty()) {
+                            LOG.warn("YSM action {} omits non-bone animation features {}",
+                                    name, loaded.omittedFeatures);
+                        }
+                    });
                 }
             }
             YsmAnimationClip clip = clips.get(action);
             if (clip == null) return;
+            long actionStart = MaidAnimationData.activeStart(maid);
+            boolean actionChanged = previous == null || !previous.action().equals(action)
+                    || previous.start() != actionStart;
+            if (actionChanged) {
+                PLAYING.put(animatable, new Playing(action, actionStart));
+                LOG.debug("YSM animation started action {} for maid {}", action, maid.getUUID());
+            }
             Object runtime = model.invoke(animatable);
             if (runtime == null) return;
             Map<String, Object> byName = new HashMap<>();
-            for (Object bone : ((Map<?, ?>) bones.invoke(runtime)).values())
-                byName.put((String) name.invoke(bone), bone);
+            Map<String, Object> byNormalizedName = new HashMap<>();
+            for (Object bone : ((Map<?, ?>) bones.invoke(runtime)).values()) {
+                String boneName = (String) name.invoke(bone);
+                byName.put(boneName, bone);
+                byNormalizedName.putIfAbsent(boneName.toLowerCase(Locale.ROOT), bone);
+            }
             // Verified default YSM model uses MAllBody for the whole-body child of Root.
             if (!byName.containsKey("MRoot") && byName.containsKey("MAllBody"))
                 byName.put("MRoot", byName.get("MAllBody"));
-            double seconds = clip.time((maid.level().getGameTime() - MaidAnimationData.activeStart(maid)
-                    + partialTick) / 20.0);
+            double elapsedSeconds = (maid.level().getGameTime() - actionStart + partialTick) / 20.0;
+            double seconds = MaidAnimationData.isLoopingAction(action)
+                    ? Math.max(0, elapsedSeconds) % clip.length
+                    : Math.min(clip.length, Math.max(0, elapsedSeconds));
             List<Saved> saved = new ArrayList<>();
+            Set<String> missingBones = actionChanged ? new LinkedHashSet<>() : null;
             SAVED.put(animatable, saved); // Also permits rollback if an invocation fails midway.
             for (var channel : clip.channels) {
                 Object bone = byName.get(channel.bone());
-                if (bone == null) continue;
+                if (bone == null) bone = byNormalizedName.get(channel.bone().toLowerCase(Locale.ROOT));
+                if (bone == null) {
+                    if (missingBones != null) missingBones.add(channel.bone());
+                    continue;
+                }
                 float[] values = channel.sample(seconds);
                 Vector3f initial = channel.offset() == 0 ? (Vector3f) bind.invoke(bone) : null;
                 for (int axis = 0; axis < 3; axis++) {
@@ -132,10 +181,13 @@ public final class YsmAnimationBridge {
                     SET[component].invoke(bone, value);
                 }
             }
-            if (!announced && !saved.isEmpty()) {
-                announced = true;
-                LOG.info("YSM animation bridge applied action {} ({} bone components) to maid {}",
+            if (actionChanged) {
+                LOG.debug("YSM animation action {} applied {} bone components to maid {}",
                         action, saved.size(), maid.getUUID());
+                if (missingBones != null && !missingBones.isEmpty()) {
+                    LOG.debug("YSM animation action {} skipped {} absent bones on maid {}: {}",
+                            action, missingBones.size(), maid.getUUID(), missingBones.stream().limit(8).toList());
+                }
             }
         } catch (Exception | LinkageError e) {
             before(animatable);

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Per-maid animation preferences and the lightweight special-action lock. */
 public final class MaidAnimationData {
@@ -47,6 +48,15 @@ public final class MaidAnimationData {
     public static final int PRIORITY_DEATH = 100;
 
     public static final Map<String, List<String>> ACTIONS = new LinkedHashMap<>();
+    private static final Set<String> PARALLEL_ACTIONS = Set.of(
+            "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether",
+            "lips", "ear_pull_left", "ear_pull_right", "hang", "game_lost2", "tailcircle", "dance1",
+            "circledance", "CLEANTAIL", "!??!");
+    private static final Set<String> LOOPING_ACTIONS = Set.of(
+            "come", "come2", "weidu", "ha", "morebeg", "sleep2", "eattail", "catchbyhook",
+            "drowning", "situp", "pet_reaction_hold", "pet_other_head", "tailpull", "lips",
+            "ear_pull_left", "ear_pull_right", "hang", "game_lost2", "tailcircle", "dance1",
+            "circledance", "CLEANTAIL", "!??!");
     static {
         ACTIONS.put("stand", List.of("circledance", "!??!"));
         ACTIONS.put("sit", List.of("come2", "ha", "tastetail"));
@@ -54,6 +64,14 @@ public final class MaidAnimationData {
     }
 
     private MaidAnimationData() {
+    }
+
+    public static boolean isParallelAction(String action) {
+        return PARALLEL_ACTIONS.contains(action);
+    }
+
+    public static boolean isLoopingAction(String action) {
+        return LOOPING_ACTIONS.contains(action);
     }
 
     public static List<String> enabledActions(EntityMaid maid, String category) {
@@ -230,6 +248,10 @@ public final class MaidAnimationData {
 
     public static long activeStart(EntityMaid maid) {
         return isActive(maid) ? maid.getPersistentData().getLong(ACTIVE_START) : Long.MIN_VALUE;
+    }
+
+    public static int activePriority(EntityMaid maid) {
+        return isActive(maid) ? maid.getPersistentData().getInt(ACTIVE_PRIORITY) : Integer.MIN_VALUE;
     }
 
     public static void serverTick(EntityMaid maid) {

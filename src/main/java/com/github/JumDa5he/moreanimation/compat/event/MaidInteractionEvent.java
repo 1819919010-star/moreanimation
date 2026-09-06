@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
+import com.github.JumDa5he.moreanimation.compat.animation.GameLostAnimation;
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
 import com.github.JumDa5he.moreanimation.compat.network.MaidVisualSettingsPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
@@ -67,6 +68,7 @@ public class MaidInteractionEvent {
             }
             restoreBowPose(maid);
             MaidAnimationData.serverTick(maid);
+            GameLostAnimation.serverTick(maid);
             if (maid.isAlive() && level.getGameTime() % 5 == 0 && !isMovementControlled(maid)) {
                 tickBowAndRefuse(maid);
             }
@@ -183,9 +185,9 @@ public class MaidInteractionEvent {
 
     @SubscribeEvent
     public static void onEntityLeave(EntityLeaveLevelEvent event) {
-        if (!event.getLevel().isClientSide() && event.getEntity() instanceof EntityMaid maid
-                && isMovementControlled(maid)) {
-            cancelSessionsFor(maid);
+        if (!event.getLevel().isClientSide() && event.getEntity() instanceof EntityMaid maid) {
+            if (isMovementControlled(maid)) cancelSessionsFor(maid);
+            GameLostAnimation.clear(maid);
         }
     }
 

@@ -12,7 +12,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
-import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
@@ -37,6 +36,9 @@ public class GameLostAnimation {
     private static final long KOWTOW_DURATION_TICKS = 60;
     private static final Map<UUID, Long> tombstoneStartTick = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> tombstoneCooldown = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> lipsWatchStart = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> lipsCooldown = new ConcurrentHashMap<>();
+    private static final Map<UUID, Boolean> cakeNear = new ConcurrentHashMap<>();
     private static final long TOMBSTONE_DURATION_TICKS = 10;
     private static final long TOMBSTONE_COOLDOWN_TICKS = 1200;
     private static final long HA_DURATION_TICKS = 120;
@@ -50,6 +52,11 @@ public class GameLostAnimation {
     public static final Map<UUID, String> ACTIVE = new ConcurrentHashMap<>();
     /** 随机动作调度表：uuid -> 正在播放的随机动作 */
     private static final Map<UUID, Scheduled> SCHEDULED = new ConcurrentHashMap<>();
+    private static final String MANAGED_ACTION = "moreanimation_legacy_managed_action";
+    private static final String MANAGED_START = "moreanimation_legacy_managed_start";
+    private static final int CONTINUOUS_DURATION = 72000;
+
+    private record Desired(String action, int priority, boolean lockMovement) {}
 
     public static void init() {
         // 服务端逻辑：女仆血量低于 30% 时持续清除寻路目标，直到血量恢复
@@ -89,6 +96,29 @@ public class GameLostAnimation {
             tombstoneCooldown.keySet().retainAll(alive);
             ACTIVE.keySet().retainAll(alive);
             SCHEDULED.keySet().retainAll(alive);
+            lipsWatchStart.keySet().retainAll(alive);
+            lipsCooldown.keySet().retainAll(alive);
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((LivingHurtEvent e) -> {
+            if (!(e.getEntity() instanceof EntityMaid maid) || maid.level().isClientSide()) return;
+            if (!(e.getSource().getEntity() instanceof Player)) return;
+            UUID uuid = maid.getUUID();
+            long now = maid.tickCount;
+            Long last = lastAttackTime.get(uuid);
+            if (last != null && now - last <= ATTACK_WINDOW_TICKS) {
+                attackCount.merge(uuid, 1, Integer::sum);
+            } else {
+                attackCount.put(uuid, 1);
+            }
+            lastAttackTime.put(uuid, now);
+            boolean hurtTriggered = attackCount.getOrDefault(uuid, 0) >= ATTACKS_NEEDED;
+            if (hurtTriggered) {
+                attackCount.remove(uuid);
+                lastAttackTime.remove(uuid);
+                MaidAnimationData.start(maid, "hurt", (int) HURT_DURATION_TICKS,
+                        MaidAnimationData.PRIORITY_INTERACTION, false);
+            }
         });
 
         if (FMLEnvironment.dist != net.minecraftforge.api.distmarker.Dist.CLIENT) return;
@@ -507,26 +537,206 @@ public class GameLostAnimation {
                     }
             ));
 
-            MinecraftForge.EVENT_BUS.addListener((LivingHurtEvent e) -> {
-                if (!(e.getEntity() instanceof EntityMaid maid)) return;
-                if (!(e.getSource().getEntity() instanceof Player)) return;
-                UUID uuid = maid.getUUID();
-                long now = (long) maid.tickCount;
+    }
 
-                // Hurt attack counting (melee)
-                Long last = lastAttackTime.get(uuid);
-                if (last != null && (now - last) <= ATTACK_WINDOW_TICKS) {
-                    attackCount.merge(uuid, 1, Integer::sum);
-                } else {
-                    attackCount.put(uuid, 1);
-                }
-                lastAttackTime.put(uuid, now);
+    /**
+     * Publishes every legacy condition/controller action through MaidAnimationData.
+     * Both the ordinary Gecko renderer and the optional YSM bridge consume the same winner.
+     */
+    public static void serverTick(EntityMaid maid) {
+        if (maid.level().isClientSide() || !maid.isAlive()) return;
 
-                // Kowtow trigger (ranged): 客户端本地判定，单机/局域网直接触发
-                if (e.getSource().getDirectEntity() instanceof Projectile) {
-                    kowtowStartTick.putIfAbsent(uuid, now);
+        tickTimedConditions(maid);
+        Desired desired = desiredContinuousAction(maid);
+        String current = MaidAnimationData.activeAction(maid);
+        String managedAction = maid.getPersistentData().getString(MANAGED_ACTION);
+        boolean managed = !managedAction.isEmpty() && managedAction.equals(current)
+                && maid.getPersistentData().getLong(MANAGED_START) == MaidAnimationData.activeStart(maid);
+        if (!managed && !managedAction.isEmpty()) {
+            clearManaged(maid);
+        }
+
+        if (desired == null) {
+            if (managed) {
+                MaidAnimationData.stop(maid);
+                clearManaged(maid);
+            }
+            return;
+        }
+        if (desired.action().equals(current)) return;
+        if (managed) MaidAnimationData.stop(maid);
+        else if (!current.isEmpty() && MaidAnimationData.activePriority(maid) >= desired.priority()) return;
+        if (MaidAnimationData.start(maid, desired.action(), CONTINUOUS_DURATION,
+                desired.priority(), desired.lockMovement())) {
+            maid.getPersistentData().putString(MANAGED_ACTION, desired.action());
+            maid.getPersistentData().putLong(MANAGED_START, MaidAnimationData.activeStart(maid));
+        }
+    }
+
+    private static void tickTimedConditions(EntityMaid maid) {
+        UUID uuid = maid.getUUID();
+        long now = maid.tickCount;
+        if (!MaidAnimationData.isActive(maid)) {
+            Long cooldown = tombstoneCooldown.get(uuid);
+            if (cooldown == null || now >= cooldown) {
+                EntityTombstone tombstone = findTombstone(maid);
+                if (tombstone != null) {
+                    tombstoneCooldown.put(uuid, now + TOMBSTONE_COOLDOWN_TICKS);
+                    faceTombstone(maid, tombstone);
+                    MaidAnimationData.start(maid, "watchtombstone", (int) TOMBSTONE_DURATION_TICKS,
+                            MaidAnimationData.PRIORITY_RANDOM, false);
+                    return;
                 }
-            });
+            }
+        }
+
+        if (MaidAnimationData.isActive(maid)) {
+            lipsWatchStart.remove(uuid);
+            return;
+        }
+        Long lipsCd = lipsCooldown.get(uuid);
+        if (lipsCd != null && now < lipsCd) return;
+        if (!isWatchedWithFood(maid)) {
+            lipsWatchStart.remove(uuid);
+            return;
+        }
+        Long watchedSince = lipsWatchStart.putIfAbsent(uuid, now);
+        if (watchedSince != null && now - watchedSince >= 60) {
+            lipsWatchStart.remove(uuid);
+            lipsCooldown.put(uuid, now + 600);
+            MaidAnimationData.start(maid, "lips", 20, MaidAnimationData.PRIORITY_RANDOM, false);
+        }
+    }
+
+    private static Desired desiredContinuousAction(EntityMaid maid) {
+        if (maid.getHealth() < maid.getMaxHealth() * 0.3f) {
+            return desired("morebeg", MaidAnimationData.PRIORITY_INJURED, true);
+        }
+        if (maid.isInWater() && maid.getAirSupply() <= 0) {
+            return desired("drowning", MaidAnimationData.PRIORITY_INJURED, false);
+        }
+        if (!maid.level().getEntitiesOfClass(FishingHook.class, maid.getBoundingBox().inflate(16),
+                hook -> hook.getHookedIn() == maid).isEmpty()) {
+            return desired("catchbyhook", MaidAnimationData.PRIORITY_INTERACTION, false);
+        }
+        if (maid.getPersistentData().getBoolean("moreanimation_pray")) {
+            return desired("pray", MaidAnimationData.PRIORITY_INTERACTION, true);
+        }
+        if (maid.getPersistentData().getBoolean("moreanimation_kowtow")) {
+            return desired("kowtow", MaidAnimationData.PRIORITY_INTERACTION, true);
+        }
+        if (maid.getPersistentData().getBoolean("moreanimation_tailpull")) {
+            return desired("tailpull", MaidAnimationData.PRIORITY_INTERACTION, false);
+        }
+        if (maid.getPersistentData().getBoolean("moreanimation_earpull")) {
+            String side = maid.getPersistentData().getInt("moreanimation_earpull_side") == 1
+                    ? "ear_pull_right" : "ear_pull_left";
+            return desired(side, MaidAnimationData.PRIORITY_INTERACTION, false);
+        }
+        if (maid.getPersistentData().getBoolean("moreanimation_hugging")) {
+            return desired("hugtogether", MaidAnimationData.PRIORITY_INTERACTION, true);
+        }
+
+        if (maid.isSleeping() && ownerHolds(maid, Items.END_ROD)) {
+            return desired("come", MaidAnimationData.PRIORITY_MANUAL, false);
+        }
+        if (maid.isMaidInSittingPose() && ownerHolds(maid, Items.END_ROD)) {
+            return desired("come2", MaidAnimationData.PRIORITY_MANUAL, false);
+        }
+        if (maid.isMaidInSittingPose() && isWeiduActive(maid)) {
+            return desired("weidu", MaidAnimationData.PRIORITY_MANUAL, false);
+        }
+        if (ownerHolds(maid, Items.WHITE_WOOL)) {
+            return desired("sleep2", MaidAnimationData.PRIORITY_MANUAL, false);
+        }
+        if (maid.isMaidInSittingPose() && ownerHolds(maid, Items.ROTTEN_FLESH)) {
+            long start = tasteStartTick.computeIfAbsent(maid.getUUID(), ignored -> (long) maid.tickCount);
+            return desired(maid.tickCount - start < TASTETAIL_TICKS ? "tastetail" : "eattail",
+                    MaidAnimationData.PRIORITY_MANUAL, false);
+        }
+        tasteStartTick.remove(maid.getUUID());
+
+        String state = maid.isSleeping() ? "sleep" : maid.isMaidInSittingPose() ? "sit" : "stand";
+        String scheduled = scheduledAnim(maid, state);
+        if (scheduled != null) {
+            if ("tastetail".equals(scheduled) && scheduledElapsed(maid) >= TAIL_EAT_PRE_TICKS) {
+                scheduled = "eattail";
+            }
+            if ("ha".equals(scheduled)) faceOwner(maid);
+            return desired(scheduled, MaidAnimationData.PRIORITY_RANDOM, false);
+        }
+
+        if (maid.isLeashed()) {
+            return desired(maid.onGround() ? "game_lost2" : "hang",
+                    MaidAnimationData.PRIORITY_RANDOM, false);
+        }
+        if (isCakeNear(maid)) return desired("tailcircle", MaidAnimationData.PRIORITY_RANDOM, false);
+        if (!maid.isMaidInSittingPose() && !maid.isSleeping() && ownerHolds(maid, Items.IRON_NUGGET)) {
+            return desired("dance1", MaidAnimationData.PRIORITY_RANDOM, false);
+        }
+        if (ownerHolds(maid, Items.SUGAR)) return desired("circledance", MaidAnimationData.PRIORITY_RANDOM, false);
+        if (maid.getPersistentData().getBoolean("moreanimation_cleantail") || ownerHolds(maid, Items.STICK)) {
+            return desired("CLEANTAIL", MaidAnimationData.PRIORITY_RANDOM, false);
+        }
+        if (ownerHolds(maid, Items.TNT)) return desired("!??!", MaidAnimationData.PRIORITY_RANDOM, false);
+        return null;
+    }
+
+    private static Desired desired(String action, int priority, boolean lockMovement) {
+        return new Desired(action, priority, lockMovement);
+    }
+
+    private static boolean ownerHolds(EntityMaid maid, net.minecraft.world.item.Item item) {
+        return maid.getOwner() instanceof Player owner && owner.getMainHandItem().is(item);
+    }
+
+    private static boolean isCakeNear(EntityMaid maid) {
+        UUID uuid = maid.getUUID();
+        if (maid.tickCount % 20 != 0) return cakeNear.getOrDefault(uuid, false);
+        net.minecraft.core.BlockPos center = maid.blockPosition();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    if (maid.level().getBlockState(center.offset(dx, dy, dz))
+                            .is(net.minecraft.world.level.block.Blocks.CAKE)) {
+                        cakeNear.put(uuid, true);
+                        return true;
+                    }
+                }
+            }
+        }
+        cakeNear.put(uuid, false);
+        return false;
+    }
+
+    private static boolean isWatchedWithFood(EntityMaid maid) {
+        for (Player player : maid.level().getEntitiesOfClass(Player.class, maid.getBoundingBox().inflate(10))) {
+            if (!player.getMainHandItem().isEdible()) continue;
+            net.minecraft.world.phys.Vec3 toMaid = maid.getEyePosition().subtract(player.getEyePosition());
+            if (toMaid.length() <= 10 && player.getViewVector(1.0F).dot(toMaid.normalize()) > 0.95) return true;
+        }
+        return false;
+    }
+
+    public static void clear(EntityMaid maid) {
+        UUID uuid = maid.getUUID();
+        tasteStartTick.remove(uuid);
+        attackCount.remove(uuid);
+        lastAttackTime.remove(uuid);
+        hurtStartTick.remove(uuid);
+        kowtowStartTick.remove(uuid);
+        tombstoneStartTick.remove(uuid);
+        tombstoneCooldown.remove(uuid);
+        lipsWatchStart.remove(uuid);
+        lipsCooldown.remove(uuid);
+        cakeNear.remove(uuid);
+        SCHEDULED.remove(uuid);
+        ACTIVE.remove(uuid);
+    }
+
+    private static void clearManaged(EntityMaid maid) {
+        maid.getPersistentData().remove(MANAGED_ACTION);
+        maid.getPersistentData().remove(MANAGED_START);
     }
 
     /** weidu 条件：坐着 + 周围一圈全是浆果丛 */
@@ -609,7 +819,6 @@ public class GameLostAnimation {
      * 每 interval tick 尝试一次，chance 概率命中后从启用动作池随机抽一个。
      */
     public static String scheduledAnim(EntityMaid entity, String state) {
-        if (MaidAnimationData.isActive(entity)) return null;
         UUID uuid = entity.getUUID();
         Scheduled cur = SCHEDULED.get(uuid);
         if (cur != null) {
@@ -620,6 +829,7 @@ public class GameLostAnimation {
             }
             SCHEDULED.remove(uuid);
         }
+        if (MaidAnimationData.isActive(entity)) return null;
         long interval = MoreAnimationConfig.getIntervalTicks(state);
         double chance = MoreAnimationConfig.getChance(state);
         if (entity.tickCount % interval == 0 && entity.getRandom().nextFloat() < chance) {

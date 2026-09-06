@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -36,11 +37,13 @@ public final class YsmAnimationClip {
     public final double length;
     public final boolean loop;
     public final List<Channel> channels;
+    public final Set<String> omittedFeatures;
 
-    private YsmAnimationClip(double length, boolean loop, List<Channel> channels) {
+    private YsmAnimationClip(double length, boolean loop, List<Channel> channels, Set<String> omittedFeatures) {
         this.length = length;
         this.loop = loop;
         this.channels = List.copyOf(channels);
+        this.omittedFeatures = Set.copyOf(omittedFeatures);
     }
 
     public static Map<String, YsmAnimationClip> read(Reader reader, Set<String> actions) {
@@ -55,18 +58,31 @@ public final class YsmAnimationClip {
     }
 
     private static YsmAnimationClip parse(String action, JsonObject clip) {
+        Set<String> omittedFeatures = new LinkedHashSet<>();
         for (String key : clip.keySet()) {
-            if (!Set.of("loop", "animation_length", "bones").contains(key)) {
+            if ("timeline".equals(key)) {
+                omittedFeatures.add(key);
+            } else if (!Set.of("loop", "animation_length", "bones").contains(key)) {
                 throw new IllegalArgumentException("Unsupported " + action + " property: " + key);
             }
         }
-        double length = clip.get("animation_length").getAsDouble();
-        if (!Double.isFinite(length) || length <= 0) {
+        double declaredLength = clip.has("animation_length")
+                ? clip.get("animation_length").getAsDouble() : Double.NaN;
+        if (clip.has("animation_length") && (!Double.isFinite(declaredLength) || declaredLength <= 0)) {
             throw new IllegalArgumentException("Invalid " + action + " clip length");
         }
-        boolean loop = clip.has("loop") && clip.get("loop").isJsonPrimitive()
-                && clip.getAsJsonPrimitive("loop").isBoolean() && clip.get("loop").getAsBoolean();
+        boolean loop = false;
+        if (clip.has("loop")) {
+            JsonElement loopValue = clip.get("loop");
+            if (!loopValue.isJsonPrimitive()) throw new IllegalArgumentException("Invalid loop mode in " + action);
+            if (loopValue.getAsJsonPrimitive().isBoolean()) {
+                loop = loopValue.getAsBoolean();
+            } else if (!"hold_on_last_frame".equals(loopValue.getAsString())) {
+                throw new IllegalArgumentException("Unsupported loop mode in " + action + ": " + loopValue);
+            }
+        }
         List<Channel> channels = new ArrayList<>();
+        double maxFrameTime = 0;
         for (var bone : clip.getAsJsonObject("bones").entrySet()) {
             for (var entry : bone.getValue().getAsJsonObject().entrySet()) {
                 int offset = switch (entry.getKey()) {
@@ -80,9 +96,11 @@ public final class YsmAnimationClip {
                 if (entry.getValue().isJsonObject()) {
                     for (var frame : entry.getValue().getAsJsonObject().entrySet()) {
                         double time = Double.parseDouble(frame.getKey());
-                        if (!Double.isFinite(time) || time < 0 || time > length) {
+                        if (!Double.isFinite(time) || time < 0
+                                || Double.isFinite(declaredLength) && time > declaredLength) {
                             throw new IllegalArgumentException("Invalid " + action + " frame time");
                         }
+                        maxFrameTime = Math.max(maxFrameTime, time);
                         keys.put(time, vector(action, frame.getValue()));
                     }
                 } else {
@@ -92,7 +110,8 @@ public final class YsmAnimationClip {
                 channels.add(new Channel(bone.getKey(), offset, keys));
             }
         }
-        return new YsmAnimationClip(length, loop, channels);
+        double length = Double.isFinite(declaredLength) ? declaredLength : Math.max(1.0, maxFrameTime);
+        return new YsmAnimationClip(length, loop, channels, omittedFeatures);
     }
 
     public double time(double seconds) {
@@ -100,6 +119,11 @@ public final class YsmAnimationClip {
     }
 
     private static float[] vector(String action, JsonElement element) {
+        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()) {
+            float scalar = element.getAsFloat();
+            if (!Float.isFinite(scalar)) throw new IllegalArgumentException("Non-finite keyframe in " + action);
+            return new float[]{scalar, scalar, scalar};
+        }
         JsonArray array = element.getAsJsonArray();
         if (array.size() != 3) throw new IllegalArgumentException("Expected numeric XYZ vector in " + action);
         float[] value = new float[3];

@@ -19,14 +19,11 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
-import java.util.Set;
 
 /** Makes custom expression/interaction layers exclusive only for bones they animate. */
 @Mixin(AnimationProcessor.class)
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AnimationProcessorMixin {
-    private static final Set<String> EXCLUSIVE_INTERACTIONS = Set.of(
-            "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether");
     @Inject(method = "tickAnimation", at = @At("RETURN"), remap = false)
     private void moreanimation$hideUnusedExpressionSeven(double seekTime, AnimationEvent event,
                                                           AnimationContext context,
@@ -86,6 +83,6 @@ public class AnimationProcessorMixin {
         Object animatable = event.getAnimatableEntity();
         if (!(animatable instanceof GeckoMaidEntity<?> gecko)
                 || !(gecko.getMaid().asEntity() instanceof EntityMaid maid)) return false;
-        return EXCLUSIVE_INTERACTIONS.contains(MaidAnimationData.activeAction(maid));
+        return MaidAnimationData.isParallelAction(MaidAnimationData.activeAction(maid));
     }
 }

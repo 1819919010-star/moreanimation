@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.network.PraySyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -98,6 +99,8 @@ public class PrayEvent {
                 PENDING_ANIMS.put(maid.getUUID(), now + PRAY_ANIM_TICKS);
                 SHRINE_POS.put(maid.getUUID(), shrinePos);
                 freezeAndFace(maid, shrinePos);
+                MaidAnimationData.start(maid, "pray", (int) PRAY_ANIM_TICKS,
+                        MaidAnimationData.PRIORITY_INTERACTION, true);
                 sendPrayState(level, maid, true);
             }
         }

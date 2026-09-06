@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.network.EarPullSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -26,6 +27,7 @@ public class EarPullEvent {
     private static final double TRIGGER_DISTANCE = 4.5D;
     private static final long LONG_PRESS_TICKS = 10;
     private static final long HOLD_TIMEOUT_TICKS = 20;
+    private static final int ACTIVE_HOLD_TICKS = 72000;
     private static final double HOLD_MAX_DISTANCE = 12.0;
     private static final double DRAG_RESPONSE = 0.35;
     private static final double DRAG_MAX_SPEED = 0.55;
@@ -81,7 +83,11 @@ public class EarPullEvent {
         PENDING_ANIMS.put(maid.getUUID(), now + EAR_PULL_ANIM_TICKS);
         COOLDOWN_UNTIL.put(maid.getUUID(), now + COOLDOWN_TICKS);
         HOLDING.put(maid.getUUID(), new HoldState(player.getUUID(), now));
-        sendEarPullState(level, maid, true, level.random.nextBoolean() ? 1 : 0);
+        int side = level.random.nextBoolean() ? 1 : 0;
+        String action = side == 1 ? "ear_pull_right" : "ear_pull_left";
+        MaidAnimationData.start(maid, action, ACTIVE_HOLD_TICKS,
+                MaidAnimationData.PRIORITY_INTERACTION, false);
+        sendEarPullState(level, maid, true, side);
     }
 
     public static void endEarPull(ServerPlayer player, EntityMaid maid) {
@@ -93,6 +99,7 @@ public class EarPullEvent {
         // 长按松开：立即停止动画恢复；点按：动画播完自然恢复
         if (now - state.holdStart >= LONG_PRESS_TICKS) {
             PENDING_ANIMS.remove(maid.getUUID());
+            stopEarAction(maid);
             sendEarPullState(level, maid, false, 0);
         }
     }
@@ -112,6 +119,7 @@ public class EarPullEvent {
             if (now >= entry.getValue() && !HOLDING.containsKey(maidUuid)) {
                 it.remove();
                 if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
+                    stopEarAction(maid);
                     sendEarPullState(level, maid, false, 0);
                 }
             }
@@ -129,6 +137,7 @@ public class EarPullEvent {
             Player holder = level.getPlayerByUUID(state.holder);
             if (holder == null || !holder.isAlive()) {
                 hi.remove();
+                stopEarAction(maid);
                 sendEarPullState(level, maid, false, 0);
                 continue;
             }
@@ -138,6 +147,7 @@ public class EarPullEvent {
             if (dist > HOLD_MAX_DISTANCE || now - state.lastTick > HOLD_TIMEOUT_TICKS) {
                 hi.remove();
                 PENDING_ANIMS.remove(maidUuid);
+                stopEarAction(maid);
                 sendEarPullState(level, maid, false, 0);
                 continue;
             }
@@ -194,6 +204,13 @@ public class EarPullEvent {
     private static boolean isCooldown(EntityMaid maid, long now) {
         Long until = COOLDOWN_UNTIL.get(maid.getUUID());
         return until != null && until > now;
+    }
+
+    private static void stopEarAction(EntityMaid maid) {
+        String action = MaidAnimationData.activeAction(maid);
+        if ("ear_pull_left".equals(action) || "ear_pull_right".equals(action)) {
+            MaidAnimationData.stop(maid);
+        }
     }
 
     private static void sendEarPullState(ServerLevel level, EntityMaid maid, boolean pulling, int side) {

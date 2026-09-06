@@ -24,7 +24,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,8 +37,6 @@ public class AnimationManagerMixin {
     private static final Map<UUID, Long> lipsCooldown = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> forcedActionStart = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> interactionActionStart = new ConcurrentHashMap<>();
-    private static final Set<String> PARALLEL_INTERACTIONS = Set.of(
-            "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether");
 
     /** Expressions and paired interactions are the only custom actions allowed to overlay TLM. */
     @Inject(method = "predicateParallel", at = @At("HEAD"), remap = false, cancellable = true)
@@ -70,14 +67,14 @@ public class AnimationManagerMixin {
         }
         if (!"parallel6".equals(animationName)) return;
         String action = MaidAnimationData.activeAction(entity);
-        if (!PARALLEL_INTERACTIONS.contains(action)) {
+        if (!MaidAnimationData.isParallelAction(action)) {
             interactionActionStart.remove(uuid);
             return;
         }
         long start = MaidAnimationData.activeStart(entity);
         Long oldStart = interactionActionStart.put(uuid, start);
         if (oldStart == null || oldStart.longValue() != start) event.getController().markNeedsReload();
-        ILoopType loop = ("pet_reaction_hold".equals(action) || "pet_other_head".equals(action))
+        ILoopType loop = MaidAnimationData.isLoopingAction(action)
                 ? ILoopType.EDefaultLoopTypes.LOOP : ILoopType.EDefaultLoopTypes.PLAY_ONCE;
         if (play(event, action, loop)) {
             cir.setReturnValue(PlayState.CONTINUE);
@@ -95,14 +92,14 @@ public class AnimationManagerMixin {
         UUID uuid = entity.getUUID();
         String action = MaidAnimationData.activeAction(entity);
         if (action.isEmpty() && entity.getPersistentData().getBoolean("moreanimation_tailpull")) action = "tailpull";
-        if (action.isEmpty() || PARALLEL_INTERACTIONS.contains(action)) {
+        if (action.isEmpty() || MaidAnimationData.isParallelAction(action)) {
             forcedActionStart.remove(uuid);
             return;
         }
         long start = MaidAnimationData.activeStart(entity);
         Long oldStart = forcedActionStart.put(uuid, start);
         if (oldStart == null || oldStart.longValue() != start) event.getController().markNeedsReload();
-        ILoopType loop = "tailpull".equals(action)
+        ILoopType loop = MaidAnimationData.isLoopingAction(action)
                 ? ILoopType.EDefaultLoopTypes.LOOP : ILoopType.EDefaultLoopTypes.PLAY_ONCE;
         if (play(event, action, loop)) {
             cir.setReturnValue(PlayState.CONTINUE);

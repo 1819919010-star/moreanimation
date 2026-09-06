@@ -5,10 +5,10 @@ never selected by project code are not counted as actions.
 
 ## Result
 
-- 38 action names are selected by current Java code and have common bone animation data in
+- 39 action names are selected by current Java code and have common bone animation data in
   `unknown.animation.json`.
-- All 38 are registered in the YSM bridge and parse successfully.
-- All 38 now reach both renderers through `MaidAnimationData.activeAction(maid)`.
+- All 39 reach the shared `MaidAnimationData.activeAction(maid)` state path.
+- 38 are registered in the YSM bridge and parse successfully; `weidu` is the one exception described below.
 - The bridge remains a soft YSM 2.6.5 integration. No YSM class appears in a common event or packet
   descriptor.
 
@@ -70,7 +70,11 @@ debug logging.
 
 `CLEANTAIL` contains a `timeline` assignment (`v.cleantial`) in addition to its bone animation. YSM
 receives all `CLEANTAIL` bone transforms, but the bridge does not execute that model variable. The
-omission is logged once when resources load. No other one of the 38 actions has an omitted feature.
+omission is logged once when resources load. No other one of the 38 compatible actions has an omitted feature.
+
+`weidu` reaches `activeAction`, but its bone data contains Molang/complex keyframes that the current
+numeric bridge deliberately rejects. It remains on the original Gecko path and is the only selected action
+not yet applied to arbitrary official YSM skins.
 
 The terminal's eight persistent expression choices are expression overlays, not actions, and keep
 their existing `moreanimation_expression`/parallel-controller path. Wine Fox form visibility and

@@ -93,7 +93,6 @@ public class GameLostAnimation {
 
         if (FMLEnvironment.dist != net.minecraftforge.api.distmarker.Dist.CLIENT) return;
         AnimationManager manager = AnimationManager.getInstance();
-
             // 1. game_lost2、use_mainhand:gohei、!??!、CLEANTAIL：通过 Mixin 注入
             //    AnimationManager.predicateMisc，在 MISC 控制器上叠加播放
 
@@ -610,6 +609,7 @@ public class GameLostAnimation {
      * 每 interval tick 尝试一次，chance 概率命中后从启用动作池随机抽一个。
      */
     public static String scheduledAnim(EntityMaid entity, String state) {
+        if (MaidAnimationData.isActive(entity)) return null;
         UUID uuid = entity.getUUID();
         Scheduled cur = SCHEDULED.get(uuid);
         if (cur != null) {
@@ -623,7 +623,7 @@ public class GameLostAnimation {
         long interval = MoreAnimationConfig.getIntervalTicks(state);
         double chance = MoreAnimationConfig.getChance(state);
         if (entity.tickCount % interval == 0 && entity.getRandom().nextFloat() < chance) {
-            List<String> pool = MoreAnimationConfig.getEnabledActions(state);
+            List<String> pool = MaidAnimationData.enabledActions(entity, state);
             if (!pool.isEmpty()) {
                 String anim = pool.get(entity.getRandom().nextInt(pool.size()));
                 SCHEDULED.put(uuid, new Scheduled(state, anim, entity.tickCount, durationOf(anim)));

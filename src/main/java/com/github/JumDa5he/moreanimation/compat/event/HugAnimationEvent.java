@@ -96,11 +96,7 @@ public class HugAnimationEvent {
             freezeAndFace(maid, partner);
         }
 
-        // 2. 扫描新对：两个女仆距离 < 1 格，且双方都不在拥抱/冷却中
-        if (level.getGameTime() % 5 != 0) {
-            return;
-        }
-        scanNewPairs(level, now);
+        // 新拥抱只由动作控制终端触发；保留旧会话维护代码以兼容存量会话。
     }
 
     private static void scanNewPairs(ServerLevel level, long now) {

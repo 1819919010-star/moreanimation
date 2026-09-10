@@ -31,6 +31,7 @@ public class ExpressionPacket {
             ServerPlayer player = ctx.get().getSender();
             if (player == null) return;
             if (player.serverLevel().getEntity(entityId) instanceof EntityMaid maid) {
+                if (!maid.isOwnedBy(player) || player.distanceToSqr(maid) > 16 * 16) return;
                 if ("stop".equals(action)) {
                     maid.getPersistentData().remove("moreanimation_expression");
                 } else {

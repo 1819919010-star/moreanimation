@@ -22,6 +22,10 @@ public class MoreAnimationConfig {
     public static ForgeConfigSpec.BooleanValue SLEEP_COME;
     public static ForgeConfigSpec.BooleanValue SLEEP_SLEEP2;
     public static ForgeConfigSpec.BooleanValue SLEEP_SITUP;
+    public static ForgeConfigSpec.DoubleValue INJURED_DAMAGE_THRESHOLD;
+    public static ForgeConfigSpec.BooleanValue WINEFOX_LOW_HEALTH_FOX;
+    public static ForgeConfigSpec.BooleanValue AUTO_PET_DEFAULT;
+    public static ForgeConfigSpec.BooleanValue AUTO_HUG_DEFAULT;
 
     public static final ForgeConfigSpec SPEC;
 
@@ -34,6 +38,23 @@ public class MoreAnimationConfig {
         SIT_COME2 = b.comment("坐着动作：come2").define("come2", true);
         SIT_HA = b.comment("坐着动作：ha").define("ha", true);
         SIT_TASTETAIL = b.comment("坐着动作：tastetail（吃尾巴）").define("tastetail", true);
+        b.pop();
+
+        b.push("interaction");
+        AUTO_PET_DEFAULT = b.comment("未在终端单独设置的女仆是否允许自动摸头；终端设置优先（默认关闭）")
+                .define("autoPetDefault", false);
+        AUTO_HUG_DEFAULT = b.comment("未在终端单独设置的女仆是否允许自动拥抱；终端设置优先（默认关闭）")
+                .define("autoHugDefault", false);
+        b.pop();
+
+        b.push("winefox");
+        WINEFOX_LOW_HEALTH_FOX = b.comment("酒狐生命值低于 20% 时是否变为狐狸形态（全局开关）")
+                .define("lowHealthFoxForm", true);
+        b.pop();
+
+        b.push("injured");
+        INJURED_DAMAGE_THRESHOLD = b.comment("单次受到至少多少点最终伤害时播放重伤倒地动画（无冷却）")
+                .defineInRange("damageThreshold", 10.0, 0.1, 2048.0);
         b.pop();
 
         b.push("stand");
@@ -70,6 +91,22 @@ public class MoreAnimationConfig {
             case "sleep": return SLEEP_CHANCE.get();
             default: return 0.2;
         }
+    }
+
+    public static double getInjuredDamageThreshold() {
+        return INJURED_DAMAGE_THRESHOLD.get();
+    }
+
+    public static boolean isWinefoxLowHealthFoxEnabled() {
+        return WINEFOX_LOW_HEALTH_FOX.get();
+    }
+
+    public static boolean isAutoPetDefaultEnabled() {
+        return AUTO_PET_DEFAULT.get();
+    }
+
+    public static boolean isAutoHugDefaultEnabled() {
+        return AUTO_HUG_DEFAULT.get();
     }
 
     public static List<String> getEnabledActions(String state) {

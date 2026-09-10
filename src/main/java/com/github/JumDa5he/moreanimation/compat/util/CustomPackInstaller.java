@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.util;
 
-import com.github.JumDa5he.moreanimation.Example;
+import com.github.JumDa5he.moreanimation.MoreAnimation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLEnvironment;
@@ -60,7 +60,7 @@ public class CustomPackInstaller {
     private static Path locateModPath() {
         try {
             if (ModList.get() != null) {
-                Path modPath = ModList.get().getModContainerById(Example.MOD_ID)
+                Path modPath = ModList.get().getModContainerById(MoreAnimation.MOD_ID)
                         .map(container -> container.getModInfo().getOwningFile().getFile().getFilePath())
                         .orElse(null);
                 if (modPath != null && Files.exists(modPath)) {

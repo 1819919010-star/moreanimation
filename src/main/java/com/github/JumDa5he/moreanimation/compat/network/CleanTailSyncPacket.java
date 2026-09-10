@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
-import com.github.JumDa5he.moreanimation.Example;
+import com.github.JumDa5he.moreanimation.MoreAnimation;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -15,7 +15,7 @@ public record CleanTailSyncPacket(int entityId, boolean cleaning) implements Cus
     private static final String TAG_CLEANTAIL = "moreanimation_cleantail";
 
     public static final CustomPacketPayload.Type<CleanTailSyncPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(Example.MOD_ID, "cleantail"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "cleantail"));
 
     public static final StreamCodec<ByteBuf, CleanTailSyncPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, CleanTailSyncPacket::entityId,

@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
-import com.github.JumDa5he.moreanimation.Example;
+import com.github.JumDa5he.moreanimation.MoreAnimation;
 import com.github.JumDa5he.moreanimation.compat.event.TailPullEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import io.netty.buffer.ByteBuf;
@@ -15,7 +15,7 @@ import org.jetbrains.annotations.NotNull;
 
 public record TailPullTriggerPacket(int entityId) implements CustomPacketPayload {
     public static final CustomPacketPayload.Type<TailPullTriggerPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(Example.MOD_ID, "tailpull_trigger"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "tailpull_trigger"));
 
     public static final StreamCodec<ByteBuf, TailPullTriggerPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, TailPullTriggerPacket::entityId,

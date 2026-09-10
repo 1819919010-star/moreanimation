@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
-import com.github.JumDa5he.moreanimation.Example;
+import com.github.JumDa5he.moreanimation.MoreAnimation;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -15,7 +15,7 @@ public record HuggingSyncPacket(int entityId, boolean hugging) implements Custom
     private static final String TAG_HUGGING = "moreanimation_hugging";
 
     public static final CustomPacketPayload.Type<HuggingSyncPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(Example.MOD_ID, "hugging"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "hugging"));
 
     public static final StreamCodec<ByteBuf, HuggingSyncPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, HuggingSyncPacket::entityId,

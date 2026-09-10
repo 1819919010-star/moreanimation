@@ -4,7 +4,16 @@
     "package": "com.github.JumDa5he.moreanimation.mixin",
     "compatibilityLevel": "JAVA_21",
     "mixins": [
-        "AnimationManagerMixin"
+        "AnimationManagerMixin",
+        "LivingEntityDeathMixin",
+        "MaidFollowOwnerTaskMixin",
+        "MaidFollowOwnerVehicleTaskMixin"
+    ],
+    "client": [
+        "AnimationProcessorMixin",
+        "GeckoMaidEntityMixin",
+        "GeckoModelLoaderMixin",
+        "YsmRendererMixin"
     ],
     "injectors": {
         "defaultRequire": 1

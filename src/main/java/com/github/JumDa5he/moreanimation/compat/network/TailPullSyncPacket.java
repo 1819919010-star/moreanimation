@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
-import com.github.JumDa5he.moreanimation.Example;
+import com.github.JumDa5he.moreanimation.MoreAnimation;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -15,7 +15,7 @@ public record TailPullSyncPacket(int entityId, boolean pulling) implements Custo
     private static final String TAG_TAILPULL = "moreanimation_tailpull";
 
     public static final CustomPacketPayload.Type<TailPullSyncPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(Example.MOD_ID, "tailpull"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "tailpull"));
 
     public static final StreamCodec<ByteBuf, TailPullSyncPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, TailPullSyncPacket::entityId,

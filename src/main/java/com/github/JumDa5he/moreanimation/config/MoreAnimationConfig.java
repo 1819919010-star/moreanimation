@@ -1,0 +1,132 @@
+package com.github.JumDa5he.moreanimation.config;
+
+import net.neoforged.neoforge.common.ModConfigSpec;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MoreAnimationConfig {
+    public static ModConfigSpec.IntValue SIT_INTERVAL_SECONDS;
+    public static ModConfigSpec.DoubleValue SIT_CHANCE;
+    public static ModConfigSpec.BooleanValue SIT_COME2;
+    public static ModConfigSpec.BooleanValue SIT_HA;
+    public static ModConfigSpec.BooleanValue SIT_TASTETAIL;
+
+    public static ModConfigSpec.IntValue STAND_INTERVAL_SECONDS;
+    public static ModConfigSpec.DoubleValue STAND_CHANCE;
+    public static ModConfigSpec.BooleanValue STAND_CIRCLEDANCE;
+    public static ModConfigSpec.BooleanValue STAND_QUESTION;
+
+    public static ModConfigSpec.IntValue SLEEP_INTERVAL_SECONDS;
+    public static ModConfigSpec.DoubleValue SLEEP_CHANCE;
+    public static ModConfigSpec.BooleanValue SLEEP_COME;
+    public static ModConfigSpec.BooleanValue SLEEP_SLEEP2;
+    public static ModConfigSpec.BooleanValue SLEEP_SITUP;
+    public static ModConfigSpec.DoubleValue INJURED_DAMAGE_THRESHOLD;
+    public static ModConfigSpec.BooleanValue WINEFOX_LOW_HEALTH_FOX;
+    public static ModConfigSpec.BooleanValue AUTO_PET_DEFAULT;
+    public static ModConfigSpec.BooleanValue AUTO_HUG_DEFAULT;
+
+    public static final ModConfigSpec SPEC;
+
+    static {
+        ModConfigSpec.Builder b = new ModConfigSpec.Builder();
+
+        b.push("sit");
+        SIT_INTERVAL_SECONDS = b.comment("坐着时动作尝试间隔（秒）").defineInRange("intervalSeconds", 60, 1, 3600);
+        SIT_CHANCE = b.comment("坐着时每次尝试触发概率（0~1）").defineInRange("chance", 0.2, 0.0, 1.0);
+        SIT_COME2 = b.comment("坐着动作：come2").define("come2", true);
+        SIT_HA = b.comment("坐着动作：ha").define("ha", true);
+        SIT_TASTETAIL = b.comment("坐着动作：tastetail（吃尾巴）").define("tastetail", true);
+        b.pop();
+
+        b.push("interaction");
+        AUTO_PET_DEFAULT = b.comment("未在终端单独设置的女仆是否允许自动摸头；终端设置优先（默认关闭）")
+                .define("autoPetDefault", false);
+        AUTO_HUG_DEFAULT = b.comment("未在终端单独设置的女仆是否允许自动拥抱；终端设置优先（默认关闭）")
+                .define("autoHugDefault", false);
+        b.pop();
+
+        b.push("winefox");
+        WINEFOX_LOW_HEALTH_FOX = b.comment("酒狐生命值低于 20% 时是否变为狐狸形态（全局开关）")
+                .define("lowHealthFoxForm", true);
+        b.pop();
+
+        b.push("injured");
+        INJURED_DAMAGE_THRESHOLD = b.comment("单次受到至少多少点最终伤害时播放重伤倒地动画（无冷却）")
+                .defineInRange("damageThreshold", 10.0, 0.1, 2048.0);
+        b.pop();
+
+        b.push("stand");
+        STAND_INTERVAL_SECONDS = b.comment("站着时动作尝试间隔（秒）").defineInRange("intervalSeconds", 60, 1, 3600);
+        STAND_CHANCE = b.comment("站着时每次尝试触发概率（0~1）").defineInRange("chance", 0.2, 0.0, 1.0);
+        STAND_CIRCLEDANCE = b.comment("站着动作：circledance").define("circledance", true);
+        STAND_QUESTION = b.comment("站着动作：!??!").define("question", true);
+        b.pop();
+
+        b.push("sleep");
+        SLEEP_INTERVAL_SECONDS = b.comment("睡觉时动作尝试间隔（秒）").defineInRange("intervalSeconds", 60, 1, 3600);
+        SLEEP_CHANCE = b.comment("睡觉时每次尝试触发概率（0~1）").defineInRange("chance", 0.2, 0.0, 1.0);
+        SLEEP_COME = b.comment("睡觉动作：come").define("come", true);
+        SLEEP_SLEEP2 = b.comment("睡觉动作：sleep2").define("sleep2", true);
+        SLEEP_SITUP = b.comment("睡觉动作：situp").define("situp", true);
+        b.pop();
+
+        SPEC = b.build();
+    }
+
+    public static long getIntervalTicks(String state) {
+        switch (state) {
+            case "sit": return SIT_INTERVAL_SECONDS.get() * 20L;
+            case "stand": return STAND_INTERVAL_SECONDS.get() * 20L;
+            case "sleep": return SLEEP_INTERVAL_SECONDS.get() * 20L;
+            default: return 1200L;
+        }
+    }
+
+    public static double getChance(String state) {
+        switch (state) {
+            case "sit": return SIT_CHANCE.get();
+            case "stand": return STAND_CHANCE.get();
+            case "sleep": return SLEEP_CHANCE.get();
+            default: return 0.2;
+        }
+    }
+
+    public static double getInjuredDamageThreshold() {
+        return INJURED_DAMAGE_THRESHOLD.get();
+    }
+
+    public static boolean isWinefoxLowHealthFoxEnabled() {
+        return WINEFOX_LOW_HEALTH_FOX.get();
+    }
+
+    public static boolean isAutoPetDefaultEnabled() {
+        return AUTO_PET_DEFAULT.get();
+    }
+
+    public static boolean isAutoHugDefaultEnabled() {
+        return AUTO_HUG_DEFAULT.get();
+    }
+
+    public static List<String> getEnabledActions(String state) {
+        List<String> list = new ArrayList<>();
+        switch (state) {
+            case "sit":
+                if (SIT_COME2.get()) list.add("come2");
+                if (SIT_HA.get()) list.add("ha");
+                if (SIT_TASTETAIL.get()) list.add("tastetail");
+                break;
+            case "stand":
+                if (STAND_CIRCLEDANCE.get()) list.add("circledance");
+                if (STAND_QUESTION.get()) list.add("!??!");
+                break;
+            case "sleep":
+                if (SLEEP_COME.get()) list.add("come");
+                if (SLEEP_SLEEP2.get()) list.add("sleep2");
+                if (SLEEP_SITUP.get()) list.add("situp");
+                break;
+        }
+        return list;
+    }
+}

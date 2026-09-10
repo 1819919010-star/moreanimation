@@ -14,6 +14,10 @@ public class MoreAnimationNetwork {
             registrar.playToClient(KowtowSyncPacket.TYPE, KowtowSyncPacket.STREAM_CODEC, KowtowSyncPacket::handle);
             registrar.playToClient(PraySyncPacket.TYPE, PraySyncPacket.STREAM_CODEC, PraySyncPacket::handle);
             registrar.playToClient(CleanTailSyncPacket.TYPE, CleanTailSyncPacket.STREAM_CODEC, CleanTailSyncPacket::handle);
+            registrar.playToClient(EarPullSyncPacket.TYPE, EarPullSyncPacket.STREAM_CODEC, EarPullSyncPacket::handle);
+            registrar.playToClient(AnimationSyncPacket.TYPE, AnimationSyncPacket.STREAM_CODEC, AnimationSyncPacket::handle);
+            registrar.playToClient(TerminalDataPacket.TYPE, TerminalDataPacket.STREAM_CODEC, TerminalDataPacket::handle);
+            registrar.playToClient(MaidVisualSettingsPacket.TYPE, MaidVisualSettingsPacket.STREAM_CODEC, MaidVisualSettingsPacket::handle);
         } else {
             registrar.playToClient(HuggingSyncPacket.TYPE, HuggingSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
             });
@@ -25,8 +29,19 @@ public class MoreAnimationNetwork {
             });
             registrar.playToClient(CleanTailSyncPacket.TYPE, CleanTailSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
             });
+            registrar.playToClient(EarPullSyncPacket.TYPE, EarPullSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
+            });
+            registrar.playToClient(AnimationSyncPacket.TYPE, AnimationSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
+            });
+            registrar.playToClient(TerminalDataPacket.TYPE, TerminalDataPacket.STREAM_CODEC, (pkt, ctx) -> {
+            });
+            registrar.playToClient(MaidVisualSettingsPacket.TYPE, MaidVisualSettingsPacket.STREAM_CODEC, (pkt, ctx) -> {
+            });
         }
 
         registrar.playToServer(TailPullTriggerPacket.TYPE, TailPullTriggerPacket.STREAM_CODEC, TailPullTriggerPacket::handle);
+        registrar.playToServer(EarPullTriggerPacket.TYPE, EarPullTriggerPacket.STREAM_CODEC, EarPullTriggerPacket::handle);
+        registrar.playToServer(ExpressionPacket.TYPE, ExpressionPacket.STREAM_CODEC, ExpressionPacket::handle);
+        registrar.playToServer(TerminalControlPacket.TYPE, TerminalControlPacket.STREAM_CODEC, TerminalControlPacket::handle);
     }
 }

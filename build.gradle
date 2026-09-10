@@ -60,6 +60,7 @@ dependencies {
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    filteringCharset = 'UTF-8'
     var replaceProperties = [
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
@@ -83,17 +84,29 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
+processResources {
+    from('src/main/resources/tlm_custom_pack/touhou_little_maid-1.0.0/assets/mypack/animation') {
+        include 'unknown.animation.json'
+        into 'assets/moreanimation/animation'
+    }
+}
+
 jar {
     manifest {
         attributes([
                 "Implementation-Title"  : project.name,
-                "Implementation-Version": "${version}"
+                "Implementation-Version": "${version}",
+                "MixinConfigs"          : "mixins.moreanimation.json"
         ])
     }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.withType(ProcessResources).configureEach {
+    filteringCharset = 'UTF-8'
 }
 
 tasks.compileJava {

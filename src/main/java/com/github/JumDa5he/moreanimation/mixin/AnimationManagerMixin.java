@@ -38,7 +38,6 @@ public class AnimationManagerMixin {
     private static final Map<UUID, Long> forcedActionStart = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> interactionActionStart = new ConcurrentHashMap<>();
 
-    /** Expressions and paired interactions are the only custom actions allowed to overlay TLM. */
     @Inject(method = "predicateParallel", at = @At("HEAD"), remap = false, cancellable = true)
     private void onPredicateParallel(AnimationEvent<GeckoMaidEntity<?>> event, String animationName,
                                      CallbackInfoReturnable<PlayState> cir) {
@@ -82,7 +81,6 @@ public class AnimationManagerMixin {
         }
     }
 
-    /** Full-body forced actions replace TLM MAIN instead of being blended into it. */
     @Inject(method = "predicateMain", at = @At("HEAD"), remap = false, cancellable = true)
     private void onPredicateMain(AnimationEvent<GeckoMaidEntity<?>> event,
                                  CallbackInfoReturnable<PlayState> cir) {

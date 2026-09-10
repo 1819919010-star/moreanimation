@@ -11,12 +11,7 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Hooks the official YSM render pipeline around its per-frame pose calculation.
- * This renderer is first loaded during normal client mod construction, after
- * Mixin configuration selection; the old animatable-base target is intentionally
- * left untouched because YSM loads it too early from MixinTweaker.
- */
+
 @Pseudo
 @Mixin(targets = "com.elfmcys.yesstevemodel.OOoo0o0oO000ooO0Oo00OoOo", remap = false)
 public abstract class YsmRendererMixin {

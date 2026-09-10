@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Prevents TLM's look-at head rotation from overwriting maid_bow's authored Head keys. */
+
 @Mixin(GeckoMaidEntity.class)
 public abstract class GeckoMaidEntityMixin {
     @Inject(method = "updateHead", at = @At("HEAD"), cancellable = true, remap = false)

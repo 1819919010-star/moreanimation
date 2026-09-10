@@ -165,14 +165,10 @@ public class EarPullEvent {
             lz /= len;
             double tx = holder.getX() + lx * TARGET_DISTANCE;
             double tz = holder.getZ() + lz * TARGET_DISTANCE;
-            // Smooth spring drag: velocity is synced and interpolated by the client. Directly
-            // changing setPos here makes remote maids advance in visible server-sized steps.
             double mdx = tx - maid.getX();
             double mdz = tz - maid.getZ();
             double mdist = Math.hypot(mdx, mdz);
             Vec3 holderVelocity = holder.getDeltaMovement();
-            // Feed the holder's own movement into the target velocity. Without this term the
-            // maid stops whenever she reaches the target, falls behind, then catches up in pulses.
             double targetVx = clamp(holderVelocity.x + mdx * DRAG_RESPONSE,
                     -DRAG_MAX_SPEED, DRAG_MAX_SPEED);
             double targetVz = clamp(holderVelocity.z + mdz * DRAG_RESPONSE,

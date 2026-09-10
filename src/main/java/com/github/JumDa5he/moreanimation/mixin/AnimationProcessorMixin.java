@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 
-/** Makes custom expression/interaction layers exclusive only for bones they animate. */
+
 @Mixin(AnimationProcessor.class)
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AnimationProcessorMixin {

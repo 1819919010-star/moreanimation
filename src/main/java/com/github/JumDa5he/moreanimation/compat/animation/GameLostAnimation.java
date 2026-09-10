@@ -39,6 +39,14 @@ public class GameLostAnimation {
     private static final Map<UUID, Long> lipsWatchStart = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> lipsCooldown = new ConcurrentHashMap<>();
     private static final Map<UUID, Boolean> cakeNear = new ConcurrentHashMap<>();
+    private static final Map<UUID, Integer> coldExposureTicks = new ConcurrentHashMap<>();
+    private static final Map<UUID, BasePoseSelection> basePoseSelections = new ConcurrentHashMap<>();
+    private static final List<String> SIT_BASE_VARIANTS = List.of("", "sit2");
+    private static final List<String> SLEEP_BASE_VARIANTS = List.of(
+            "", "moresleep2", "moresleep3", "moresleep4", "moresleep5", "moresleep6");
+    private static final java.util.Set<String> BASE_POSE_ACTIONS = java.util.Set.of(
+            "sit2", "moresleep2", "moresleep3", "moresleep4", "moresleep5", "moresleep6");
+    private static final int COLD_TRIGGER_TICKS = 100;
     private static final long TOMBSTONE_DURATION_TICKS = 10;
     private static final long TOMBSTONE_COOLDOWN_TICKS = 1200;
     private static final long HA_DURATION_TICKS = 120;
@@ -57,6 +65,7 @@ public class GameLostAnimation {
     private static final int CONTINUOUS_DURATION = 72000;
 
     private record Desired(String action, int priority, boolean lockMovement) {}
+    private record BasePoseSelection(String state, String action) {}
 
     public static void init() {
         // 服务端逻辑：女仆血量低于 30% 时持续清除寻路目标，直到血量恢复
@@ -66,7 +75,6 @@ public class GameLostAnimation {
             for (Entity entity : serverLevel.getAllEntities()) {
                 if (entity instanceof EntityMaid maid && maid.isAlive()) {
                     if (maid.getHealth() < maid.getMaxHealth() * 0.3f) {
-                        // morebeg 触发期间停止移动，避免跪着走路
                         maid.getNavigation().stop();
                         maid.getNavigation().setSpeedModifier(0.0D);
                         maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
@@ -78,7 +86,7 @@ public class GameLostAnimation {
             }
         });
 
-        // 客户端定期清理已不存在女仆的动画状态残留（魂符收走/死亡/卸载后），防止 Map 无限膨胀
+
         MinecraftForge.EVENT_BUS.addListener((TickEvent.LevelTickEvent event) -> {
             if (event.phase != TickEvent.Phase.END) return;
             if (!event.level.isClientSide()) return;
@@ -123,10 +131,7 @@ public class GameLostAnimation {
 
         if (FMLEnvironment.dist != net.minecraftforge.api.distmarker.Dist.CLIENT) return;
         AnimationManager manager = AnimationManager.getInstance();
-            // 1. game_lost2、use_mainhand:gohei、!??!、CLEANTAIL：通过 Mixin 注入
-            //    AnimationManager.predicateMisc，在 MISC 控制器上叠加播放
 
-            // 1.5 come 动画：原条件（睡觉且主人持末地烛）保留；新条件：睡觉且主人 3 格内，每 10 秒 60% 概率触发 10 秒，与 situp 互斥
         manager.register(new AnimationState(
                 "come",
                 ILoopType.EDefaultLoopTypes.LOOP,
@@ -152,7 +157,7 @@ public class GameLostAnimation {
                 }
         ));
 
-        // 1.6 come2 动画：原条件（坐着且主人持末地烛）保留；新条件：坐着时每 1 秒 50% 概率触发 10 秒，与 ha/weidu 互斥
+
         manager.register(new AnimationState(
                 "come2",
                 ILoopType.EDefaultLoopTypes.LOOP,
@@ -161,14 +166,12 @@ public class GameLostAnimation {
                     EntityMaid entity = (EntityMaid) maid.asEntity();
                     UUID uuid = entity.getUUID();
                     if (!canClaim(uuid, "come2")) return false;
-                    // 物品触发：坐着且主人主手持末地烛时循环播放
                     if (entity.isMaidInSittingPose()
                             && entity.getOwner() instanceof Player owner
                             && owner.getMainHandItem().is(Items.END_ROD)) {
                         claim(uuid, "come2");
                         return true;
                     }
-                    // 随机调度：坐着动作池（weidu 播放中不触发）
                     if (entity.isMaidInSittingPose() && !isWeiduActive(entity)
                             && "come2".equals(scheduledAnim(entity, "sit"))) {
                         claim(uuid, "come2");
@@ -179,7 +182,6 @@ public class GameLostAnimation {
                 }
         ));
 
-        // 1.7 weidu 动画：女仆坐着且周围一圈全是浆果丛时循环播放（ha/come2 播放中不触发）
         manager.register(new AnimationState(
                 "weidu",
                 ILoopType.EDefaultLoopTypes.LOOP,
@@ -212,7 +214,7 @@ public class GameLostAnimation {
                 }
         ));
 
-        // 1.8 ha 动画：女仆坐着且主人 3 格内，每 1 秒 50% 概率触发 6 秒，播放期间面朝主人（与 come2/weidu 互斥）
+
         manager.register(new AnimationState(
                 "ha",
                 ILoopType.EDefaultLoopTypes.LOOP,
@@ -225,7 +227,6 @@ public class GameLostAnimation {
                         releaseIfMine(uuid, "ha");
                         return false;
                     }
-                    // 随机调度：坐着动作池（weidu 播放中不触发）
                     if (!isWeiduActive(entity) && "ha".equals(scheduledAnim(entity, "sit"))) {
                         faceOwner(entity);
                         claim(uuid, "ha");
@@ -236,7 +237,6 @@ public class GameLostAnimation {
                 }
         ));
 
-        // 2. morebeg 动画：女仆血量低于 30% 时循环播放
             manager.register(new AnimationState(
                     "morebeg",
                     ILoopType.EDefaultLoopTypes.LOOP,
@@ -256,7 +256,6 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 3. sleep2 动画：原有（主人主手持白色羊毛）保留；新：睡觉时每 13 秒 30% 概率播放一次，与 come/situp 互斥
             manager.register(new AnimationState(
                     "sleep2",
                     ILoopType.EDefaultLoopTypes.LOOP,
@@ -265,12 +264,10 @@ public class GameLostAnimation {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
                         if (!canClaim(uuid, "sleep2")) return false;
-                        // 物品触发：主人主手持白色羊毛时循环播放
                         if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.WHITE_WOOL)) {
                             claim(uuid, "sleep2");
                             return true;
                         }
-                        // 随机调度：睡觉动作池
                         if (entity.isSleeping() && "sleep2".equals(scheduledAnim(entity, "sleep"))) {
                             claim(uuid, "sleep2");
                             return true;
@@ -280,8 +277,6 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 4. tastetail + eattail 动画组合：女仆坐下（坐姿）时触发
-            // tastetail 先播 45 tick（~2.2秒）摆出抓尾巴姿势，然后循环播放 eattail
             manager.register(new AnimationState(
                     "tastetail",
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
@@ -311,7 +306,6 @@ public class GameLostAnimation {
                             return false;
                         }
                         tasteStartTick.remove(entity.getUUID());
-                        // 随机调度：坐着动作池抽到 tastetail，先抓尾巴 45 tick
                         if (!sitting || isWeiduActive(entity)) {
                             releaseIfMine(uuid, "tastetail");
                             return false;
@@ -368,7 +362,6 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 8. catchbyhook 动画：女仆被钓鱼竿鱼钩钩住时循环播放
             manager.register(new AnimationState(
                     "catchbyhook",
                     ILoopType.EDefaultLoopTypes.LOOP,
@@ -388,7 +381,6 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 9. hurt 动画：女仆被玩家连续攻击 5 次时触发（播放一次）
             manager.register(new AnimationState(
                     "hurt",
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
@@ -420,8 +412,6 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 10. kowtow 动画：女仆被投射物（远程）击中时触发一次
-            // 双通道判定：客户端本地监听（单机/局域网都能触发）+ 服务端同步包标记（联机保底）
             manager.register(new AnimationState(
                     "kowtow",
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
@@ -447,7 +437,7 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 11. drowning 动画：女仆溺水时持续播放
+
             manager.register(new AnimationState(
                     "drowning",
                     ILoopType.EDefaultLoopTypes.LOOP,
@@ -465,7 +455,6 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 12. situp 动画：女仆睡觉时每 10 秒 50% 概率触发 20 秒（come 播放中不触发）
             manager.register(new AnimationState(
                     "situp",
                     ILoopType.EDefaultLoopTypes.LOOP,
@@ -484,7 +473,6 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 13. pray 动画：女仆在神龛附近祈祷时播放一次（服务端判定 + 同步包标记）
             manager.register(new AnimationState(
                     "pray",
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
@@ -502,7 +490,7 @@ public class GameLostAnimation {
                     }
             ));
 
-            // 14. watchtombstone 动画：女仆周围有墓碑时面对墓碑播放一次，CD 1 分钟
+
             manager.register(new AnimationState(
                     "watchtombstone",
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
@@ -539,10 +527,7 @@ public class GameLostAnimation {
 
     }
 
-    /**
-     * Publishes every legacy condition/controller action through MaidAnimationData.
-     * Both the ordinary Gecko renderer and the optional YSM bridge consume the same winner.
-     */
+
     public static void serverTick(EntityMaid maid) {
         if (maid.level().isClientSide() || !maid.isAlive()) return;
 
@@ -609,11 +594,16 @@ public class GameLostAnimation {
     }
 
     private static Desired desiredContinuousAction(EntityMaid maid) {
+        String basePoseAction = selectedBasePoseAction(maid);
+        boolean coldLongEnough = tickColdExposure(maid);
         if (maid.getHealth() < maid.getMaxHealth() * 0.3f) {
             return desired("morebeg", MaidAnimationData.PRIORITY_INJURED, true);
         }
         if (maid.isInWater() && maid.getAirSupply() <= 0) {
             return desired("drowning", MaidAnimationData.PRIORITY_INJURED, false);
+        }
+        if (coldLongEnough) {
+            return desired("cold_hug_shiver", MaidAnimationData.PRIORITY_INJURED, false);
         }
         if (!maid.level().getEntitiesOfClass(FishingHook.class, maid.getBoundingBox().inflate(16),
                 hook -> hook.getHookedIn() == maid).isEmpty()) {
@@ -679,7 +669,47 @@ public class GameLostAnimation {
             return desired("CLEANTAIL", MaidAnimationData.PRIORITY_RANDOM, false);
         }
         if (ownerHolds(maid, Items.TNT)) return desired("!??!", MaidAnimationData.PRIORITY_RANDOM, false);
+        if (basePoseAction != null) {
+            return desired(basePoseAction, MaidAnimationData.PRIORITY_RANDOM, false);
+        }
         return null;
+    }
+
+    /** Select once when entering the real TLM sit/sleep state; an empty action keeps the original pose. */
+    private static String selectedBasePoseAction(EntityMaid maid) {
+        String state = maid.isSleeping() ? "sleep" : maid.isMaidInSittingPose() ? "sit" : "";
+        UUID uuid = maid.getUUID();
+        if ("sleep".equals(state) && !MaidAnimationData.randomSleepPose(maid)) {
+            basePoseSelections.remove(uuid);
+            return null;
+        }
+        if (state.isEmpty()) {
+            basePoseSelections.remove(uuid);
+            return null;
+        }
+        BasePoseSelection selected = basePoseSelections.get(uuid);
+        if (selected == null || !selected.state().equals(state)) {
+            List<String> choices = "sleep".equals(state) ? SLEEP_BASE_VARIANTS : SIT_BASE_VARIANTS;
+            selected = new BasePoseSelection(state, choices.get(maid.getRandom().nextInt(choices.size())));
+            basePoseSelections.put(uuid, selected);
+        }
+        return selected.action().isEmpty() ? null : selected.action();
+    }
+
+    /** Five uninterrupted seconds in powder snow are required; leaving it resets the accumulation. */
+    private static boolean tickColdExposure(EntityMaid maid) {
+        net.minecraft.core.BlockPos feet = maid.blockPosition();
+        boolean cold = maid.level().getBlockState(feet).is(net.minecraft.world.level.block.Blocks.POWDER_SNOW)
+                || maid.level().getBlockState(feet.below()).is(net.minecraft.world.level.block.Blocks.POWDER_SNOW);
+        UUID uuid = maid.getUUID();
+        if (!cold) {
+            coldExposureTicks.remove(uuid);
+            return false;
+        }
+        int ticks = Math.min(COLD_TRIGGER_TICKS,
+                coldExposureTicks.getOrDefault(uuid, 0) + 1);
+        coldExposureTicks.put(uuid, ticks);
+        return ticks >= COLD_TRIGGER_TICKS;
     }
 
     private static Desired desired(String action, int priority, boolean lockMovement) {
@@ -730,6 +760,8 @@ public class GameLostAnimation {
         lipsWatchStart.remove(uuid);
         lipsCooldown.remove(uuid);
         cakeNear.remove(uuid);
+        coldExposureTicks.remove(uuid);
+        basePoseSelections.remove(uuid);
         SCHEDULED.remove(uuid);
         ACTIVE.remove(uuid);
     }
@@ -820,6 +852,11 @@ public class GameLostAnimation {
      */
     public static String scheduledAnim(EntityMaid entity, String state) {
         UUID uuid = entity.getUUID();
+        if ("sleep".equals(state) && !MaidAnimationData.randomSleepPose(entity)) {
+            Scheduled current = SCHEDULED.get(uuid);
+            if (current != null && current.state.equals(state)) SCHEDULED.remove(uuid);
+            return null;
+        }
         Scheduled cur = SCHEDULED.get(uuid);
         if (cur != null) {
             if (cur.state.equals(state)
@@ -829,7 +866,8 @@ public class GameLostAnimation {
             }
             SCHEDULED.remove(uuid);
         }
-        if (MaidAnimationData.isActive(entity)) return null;
+        String activeAction = MaidAnimationData.activeAction(entity);
+        if (!activeAction.isEmpty() && !BASE_POSE_ACTIONS.contains(activeAction)) return null;
         long interval = MoreAnimationConfig.getIntervalTicks(state);
         double chance = MoreAnimationConfig.getChance(state);
         if (entity.tickCount % interval == 0 && entity.getRandom().nextFloat() < chance) {

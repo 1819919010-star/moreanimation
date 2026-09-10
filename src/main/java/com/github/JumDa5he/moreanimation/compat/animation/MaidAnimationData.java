@@ -34,6 +34,8 @@ public final class MaidAnimationData {
     private static final String AUTO_PET_SET = "moreanimation_auto_pet_set";
     private static final String AUTO_HUG = "moreanimation_auto_hug";
     private static final String AUTO_HUG_SET = "moreanimation_auto_hug_set";
+    private static final String RANDOM_SLEEP_POSE = "moreanimation_random_sleep_pose";
+    private static final String RANDOM_SLEEP_POSE_SET = "moreanimation_random_sleep_pose_set";
     private static final String FORM_MODE = "moreanimation_form_mode";
     public static final String AUTO_INTERACTION_COOLDOWN = "moreanimation_auto_interaction_cooldown";
 
@@ -56,7 +58,8 @@ public final class MaidAnimationData {
             "come", "come2", "weidu", "ha", "morebeg", "sleep2", "eattail", "catchbyhook",
             "drowning", "situp", "pet_reaction_hold", "pet_other_head", "tailpull", "lips",
             "ear_pull_left", "ear_pull_right", "hang", "game_lost2", "tailcircle", "dance1",
-            "circledance", "CLEANTAIL", "!??!");
+            "circledance", "CLEANTAIL", "!??!", "sit2", "moresleep2", "moresleep3",
+            "moresleep4", "moresleep5", "moresleep6", "cold_hug_shiver", "ground_hurt");
     static {
         ACTIONS.put("stand", List.of("circledance", "!??!"));
         ACTIONS.put("sit", List.of("come2", "ha", "tastetail"));
@@ -153,6 +156,16 @@ public final class MaidAnimationData {
     public static void setAutoHug(EntityMaid maid, boolean enabled) {
         maid.getPersistentData().putBoolean(AUTO_HUG_SET, true);
         maid.getPersistentData().putBoolean(AUTO_HUG, enabled);
+    }
+
+    public static boolean randomSleepPose(EntityMaid maid) {
+        CompoundTag data = maid.getPersistentData();
+        return !data.getBoolean(RANDOM_SLEEP_POSE_SET) || data.getBoolean(RANDOM_SLEEP_POSE);
+    }
+
+    public static void setRandomSleepPose(EntityMaid maid, boolean enabled) {
+        maid.getPersistentData().putBoolean(RANDOM_SLEEP_POSE_SET, true);
+        maid.getPersistentData().putBoolean(RANDOM_SLEEP_POSE, enabled);
     }
 
     public static int formMode(EntityMaid maid) {
@@ -299,6 +312,8 @@ public final class MaidAnimationData {
             case "come" -> 200;
             case "sleep2" -> 130;
             case "situp" -> 400;
+            case "ground_hurt" -> 20;
+            case "cold_hug_shiver" -> 12;
             default -> 100;
         };
     }

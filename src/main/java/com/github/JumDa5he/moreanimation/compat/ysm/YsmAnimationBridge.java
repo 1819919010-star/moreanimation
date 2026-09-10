@@ -18,19 +18,15 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- * Version-pinned runtime bridge. Official YSM's MixinTweaker loads the old
- * YsmAnimatableMixin target during config selection, so the active hook lives
- * in the later-loaded YSM renderer instead.
- * No YSM classes occur in JVM descriptors or imports.
- */
+
 @Mod.EventBusSubscriber(modid = "moreanimation", value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";
-    /** Every common animation that current Java code can actually select. */
     private static final Set<String> SUPPORTED_ACTIONS = Set.of(
-            "circledance", "!??!", "come", "come2", "ha", "tastetail", "eattail", "sleep2", "situp",
+            "circledance", "!??!", "come", "come2", "weidu", "ha", "tastetail", "eattail", "sleep2", "situp",
+            "sit2", "moresleep4", "moresleep6",
+            "cold_hug_shiver", "ground_hurt",
             "maid_bow", "refuse", "injured_kneel", "death_fall", "death_drown", "death_burn",
             "death_ranged", "fear_retreat_fall", "pet_reaction", "pet_reaction_hold", "pet_other_head",
             "pet_other_head_raise", "hugtogether", "morebeg", "catchbyhook", "hurt", "kowtow",
@@ -39,6 +35,14 @@ public final class YsmAnimationBridge {
     /** Persistent terminal expressions played independently from the main action. */
     private static final Set<String> SUPPORTED_EXPRESSIONS = Set.of(
             "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang");
+    /** YSM already lowers its model for a sitting maid; keep that computed root height for seated clips. */
+    private static final Set<String> SEATED_ACTIONS = Set.of(
+            "come2", "weidu", "ha", "tastetail", "eattail", "sit2");
+    /** Per-clip YSM bed-axis correction; values are applied in YSM's final bone coordinate system. */
+    private static final Map<String, Float> SLEEP_YAW_CORRECTIONS = Map.of(
+            "moresleep4", (float) Math.toRadians(-90.0));
+    private static final Set<String> ROOT_POSITION_BONES = Set.of(
+            "root", "mroot", "mallbody", "allbody");
     /** Body gesture channels embedded in expression clips are excluded from the YSM overlay. */
     private static final Set<String> EXPRESSION_BONES = Set.of(
             "Head", "AllHead", "EyeBrow", "RightEyebrow", "LeftEyebrow",
@@ -210,12 +214,12 @@ public final class YsmAnimationBridge {
                 double seconds = MaidAnimationData.isLoopingAction(action)
                         ? Math.max(0, elapsedSeconds) % clip.length
                         : Math.min(clip.length, Math.max(0, elapsedSeconds));
-                applyClip(clip, seconds, byName, byNormalizedName, saved, missingBones, false);
+                applyClip(action, clip, seconds, byName, byNormalizedName, saved, missingBones, false);
             }
             if (applyExpression) {
                 YsmAnimationClip clip = clips.get(expression);
                 double elapsedSeconds = (now - previousExpression.start() + partialTick) / 20.0;
-                applyClip(clip, Math.max(0, elapsedSeconds) % clip.length,
+                applyClip(expression, clip, Math.max(0, elapsedSeconds) % clip.length,
                         byName, byNormalizedName, saved, missingExpressionBones, true);
             }
             if (actionChanged) {
@@ -236,7 +240,8 @@ public final class YsmAnimationBridge {
         }
     }
 
-    private static void applyClip(YsmAnimationClip clip, double seconds, Map<String, Object> byName,
+    private static void applyClip(String animation, YsmAnimationClip clip, double seconds,
+                                  Map<String, Object> byName,
                                   Map<String, Object> byNormalizedName, List<Saved> saved,
                                   Set<String> missingBones, boolean expressionOnly) throws ReflectiveOperationException {
         for (var channel : clip.channels) {
@@ -249,12 +254,22 @@ public final class YsmAnimationBridge {
             }
             float[] values = channel.sample(seconds);
             Vector3f initial = channel.offset() == 0 ? (Vector3f) bind.invoke(bone) : null;
+            boolean preserveSeatHeight = !expressionOnly && channel.offset() == 3
+                    && SEATED_ACTIONS.contains(animation)
+                    && ROOT_POSITION_BONES.contains(channel.bone().toLowerCase(Locale.ROOT));
+            Float sleepYawCorrection = !expressionOnly && channel.offset() == 0
+                    && ROOT_POSITION_BONES.contains(channel.bone().toLowerCase(Locale.ROOT))
+                    ? SLEEP_YAW_CORRECTIONS.get(animation) : null;
             for (int axis = 0; axis < 3; axis++) {
+                // Gecko seated clips contain their own downward root translation. YSM's pose calculation has
+                // already lowered a sitting maid, so applying the Y component again embeds the model in terrain.
+                if (preserveSeatHeight && axis == 1) continue;
                 int component = channel.offset() + axis;
                 saved.add(new Saved(bone, component, ((Number) GET[component].invoke(bone)).floatValue()));
                 float value = values[axis];
                 if (initial != null) {
                     value = initial.get(axis) + (float) Math.toRadians(value) * (axis == 2 ? 1 : -1);
+                    if (sleepYawCorrection != null && axis == 1) value += sleepYawCorrection;
                 }
                 SET[component].invoke(bone, value);
             }

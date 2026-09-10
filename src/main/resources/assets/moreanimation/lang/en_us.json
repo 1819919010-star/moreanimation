@@ -67,6 +67,8 @@
   "gui.moreanimation.auto_pet.off": "Auto head-pat: Off",
   "gui.moreanimation.auto_hug.on": "Auto hug: On",
   "gui.moreanimation.auto_hug.off": "Auto hug: Off",
+  "gui.moreanimation.random_sleep_pose.on": "Random sleep pose: On",
+  "gui.moreanimation.random_sleep_pose.off": "Random sleep pose: Off",
   "gui.moreanimation.interaction.cooldown": "Automatic interaction cooldown: 1 minute",
   "gui.moreanimation.form.auto": "Current form: Automatic",
   "gui.moreanimation.form.human": "Current form: Human",

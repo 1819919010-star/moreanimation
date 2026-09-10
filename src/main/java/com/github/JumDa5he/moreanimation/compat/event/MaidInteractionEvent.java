@@ -151,12 +151,27 @@ public class MaidInteractionEvent {
     @SubscribeEvent
     public static void onDamage(LivingDamageEvent event) {
         if (!(event.getEntity() instanceof EntityMaid maid) || maid.level().isClientSide()) return;
+        boolean survives = maid.getHealth() - event.getAmount() > 0.0F;
+        if (survives && isGroundContactDamage(event.getSource())) {
+            if (!MaidAnimationData.isActive(maid, "ground_hurt")) {
+                MaidAnimationData.start(maid, "ground_hurt", MaidAnimationData.duration("ground_hurt"),
+                        MaidAnimationData.PRIORITY_INJURED, false);
+            }
+            return;
+        }
         if (event.getAmount() >= MoreAnimationConfig.getInjuredDamageThreshold()
-                && maid.getHealth() - event.getAmount() > 0.0F
+                && survives
                 && MaidAnimationData.injuredAuto(maid)) {
             MaidAnimationData.start(maid, "injured_kneel", MaidAnimationData.duration("injured_kneel"),
                     MaidAnimationData.PRIORITY_INJURED, true);
         }
+    }
+
+    private static boolean isGroundContactDamage(DamageSource source) {
+        return source.is(DamageTypes.HOT_FLOOR)
+                || source.is(DamageTypes.CACTUS)
+                || source.is(DamageTypes.SWEET_BERRY_BUSH)
+                || source.is(DamageTypes.IN_FIRE);
     }
 
     @SubscribeEvent
@@ -274,7 +289,6 @@ public class MaidInteractionEvent {
         }
     }
 
-    /** Used by the follow-task mixins so vanilla following cannot steal an interaction path. */
     public static boolean isMovementControlled(EntityMaid maid) {
         UUID id = maid.getUUID();
         if (SESSIONS.containsKey(id)) return true;

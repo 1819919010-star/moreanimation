@@ -10,7 +10,9 @@ import java.util.Set;
 
 public final class YsmAnimationClipCheck {
     private static final Set<String> ACTIONS = Set.of(
-            "circledance", "!??!", "come", "come2", "ha", "tastetail", "eattail", "sleep2", "situp",
+            "circledance", "!??!", "come", "come2", "weidu", "ha", "tastetail", "eattail", "sleep2", "situp",
+            "sit2", "moresleep4", "moresleep6",
+            "cold_hug_shiver", "ground_hurt",
             "maid_bow", "refuse", "injured_kneel", "death_fall", "death_drown", "death_burn",
             "death_ranged", "fear_retreat_fall", "pet_reaction", "pet_reaction_hold", "pet_other_head",
             "pet_other_head_raise", "hugtogether", "morebeg", "catchbyhook", "hurt", "kowtow",
@@ -57,6 +59,9 @@ public final class YsmAnimationClipCheck {
         equal(ha.length, 1);
         equal(ha.time(1.25), 0.25);
         equal(channel(clips.get("injured_kneel"), "RightEyePublic", 6).sample(0)[0], 0);
+
+        YsmAnimationClip weidu = clips.get("weidu");
+        equal(channel(weidu, "Expression_4", 0).sample(0)[2], 180);
 
         YsmAnimationClip dizziness = clips.get("dizziness");
         equal(channel(dizziness, "Head", 0).sample(0.25)[0], 5.42918125);

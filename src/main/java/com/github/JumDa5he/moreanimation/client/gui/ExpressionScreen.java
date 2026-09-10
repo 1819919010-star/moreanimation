@@ -29,6 +29,7 @@ public class ExpressionScreen extends Screen {
     private boolean injuredAuto = true;
     private boolean autoPet = false;
     private boolean autoHug = false;
+    private boolean randomSleepPose = true;
     private int formMode = MaidAnimationData.FORM_AUTO;
 
     public ExpressionScreen(int maidId) {
@@ -62,6 +63,7 @@ public class ExpressionScreen extends Screen {
         if (tab == Tab.EXPRESSIONS) buildExpressions(contentX, contentY);
         else if (tab == Tab.OTHER) buildOther(contentX, contentY);
         else if (tab == Tab.INTERACTION) buildInteractions(contentX, contentY);
+        else if (tab == Tab.SLEEP) buildSleep(contentX, contentY);
         else buildCategory(contentX, contentY, tab.category);
     }
 
@@ -87,6 +89,18 @@ public class ExpressionScreen extends Screen {
             addAction(x + 266, by, 98, "gui.moreanimation.play_now",
                     () -> sendControl("play", category, action, true));
         }
+    }
+
+    private void buildSleep(int x, int y) {
+        addToggle(x, y, 364, Component.translatable(randomSleepPose
+                        ? "gui.moreanimation.random_sleep_pose.on"
+                        : "gui.moreanimation.random_sleep_pose.off"), randomSleepPose,
+                () -> {
+                    randomSleepPose = !randomSleepPose;
+                    sendControl("random_sleep_pose", "", "", randomSleepPose);
+                    rebuild();
+                });
+        buildCategory(x, y + 32, "sleep");
     }
 
     private void buildInteractions(int x, int y) {
@@ -158,12 +172,14 @@ public class ExpressionScreen extends Screen {
     }
 
     public void receiveData(Map<String, Integer> newMasks, boolean newInjuredAuto,
-                            boolean newAutoPet, boolean newAutoHug, int newFormMode) {
+                            boolean newAutoPet, boolean newAutoHug, boolean newRandomSleepPose,
+                            int newFormMode) {
         masks.clear();
         masks.putAll(newMasks);
         injuredAuto = newInjuredAuto;
         autoPet = newAutoPet;
         autoHug = newAutoHug;
+        randomSleepPose = newRandomSleepPose;
         formMode = newFormMode;
         rebuild();
     }

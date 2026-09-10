@@ -15,7 +15,6 @@ import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 
-/** Numeric Bedrock animation clips consumed by the version-pinned YSM renderer bridge. */
 public final class YsmAnimationClip {
     private record Keyframe(float[] value, boolean catmullRom) {}
 

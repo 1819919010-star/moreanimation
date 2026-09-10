@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.io.IOException;
 import java.io.InputStream;
 
-/** Adds the bundled actions to every Gecko maid animation file; unmatched bones are ignored. */
+
 @Mixin(GeckoModelLoader.class)
 public class GeckoModelLoaderMixin {
     @Unique private static final Logger MOREANIMATION_LOGGER = LogManager.getLogger();

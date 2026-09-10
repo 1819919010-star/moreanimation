@@ -67,6 +67,8 @@
   "gui.moreanimation.auto_pet.off": "自动摸头：关",
   "gui.moreanimation.auto_hug.on": "自动拥抱：开",
   "gui.moreanimation.auto_hug.off": "自动拥抱：关",
+  "gui.moreanimation.random_sleep_pose.on": "随机睡姿：开",
+  "gui.moreanimation.random_sleep_pose.off": "随机睡姿：关",
   "gui.moreanimation.interaction.cooldown": "自动互动冷却：1 分钟",
   "gui.moreanimation.form.auto": "当前形态：自动",
   "gui.moreanimation.form.human": "当前形态：人形",

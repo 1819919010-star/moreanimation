@@ -65,6 +65,10 @@ public class TerminalControlPacket {
                     MaidAnimationData.setAutoHug(maid, enabled);
                     sendData(player, maid);
                 }
+                case "random_sleep_pose" -> {
+                    MaidAnimationData.setRandomSleepPose(maid, enabled);
+                    sendData(player, maid);
+                }
                 case "form_mode" -> {
                     int mode = parseFormMode(value);
                     if (mode < 0) return;

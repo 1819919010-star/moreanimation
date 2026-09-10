@@ -17,6 +17,7 @@ public class TerminalDataPacket {
     private final boolean injuredAuto;
     private final boolean autoPet;
     private final boolean autoHug;
+    private final boolean randomSleepPose;
     private final int formMode;
 
     public TerminalDataPacket(EntityMaid maid) {
@@ -32,6 +33,7 @@ public class TerminalDataPacket {
         injuredAuto = MaidAnimationData.injuredAuto(maid);
         autoPet = MaidAnimationData.autoPet(maid);
         autoHug = MaidAnimationData.autoHug(maid);
+        randomSleepPose = MaidAnimationData.randomSleepPose(maid);
         formMode = MaidAnimationData.formMode(maid);
     }
 
@@ -42,6 +44,7 @@ public class TerminalDataPacket {
         injuredAuto = buf.readBoolean();
         autoPet = buf.readBoolean();
         autoHug = buf.readBoolean();
+        randomSleepPose = buf.readBoolean();
         formMode = buf.readVarInt();
     }
 
@@ -51,13 +54,14 @@ public class TerminalDataPacket {
         buf.writeBoolean(injuredAuto);
         buf.writeBoolean(autoPet);
         buf.writeBoolean(autoHug);
+        buf.writeBoolean(randomSleepPose);
         buf.writeVarInt(formMode);
     }
 
     public void handle(Supplier<NetworkEvent.Context> context) {
         context.get().enqueueWork(() -> {
             if (Minecraft.getInstance().screen instanceof ExpressionScreen screen && screen.getMaidId() == maidId) {
-                screen.receiveData(masks, injuredAuto, autoPet, autoHug, formMode);
+                screen.receiveData(masks, injuredAuto, autoPet, autoHug, randomSleepPose, formMode);
             }
         });
         context.get().setPacketHandled(true);

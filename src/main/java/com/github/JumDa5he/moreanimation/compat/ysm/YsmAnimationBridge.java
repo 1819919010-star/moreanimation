@@ -25,7 +25,7 @@ import java.util.*;
  * in the later-loaded YSM renderer instead.
  * No YSM classes occur in JVM descriptors or imports.
  */
-@EventBusSubscriber(modid = "moreanimation", value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = "moreanimation", value = Dist.CLIENT)
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";

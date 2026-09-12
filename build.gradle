@@ -96,7 +96,7 @@ jar {
         attributes([
                 "Implementation-Title"  : project.name,
                 "Implementation-Version": "${version}",
-                "MixinConfigs"          : "mixins.moreanimation.json"
+                "MixinConfigs"          : "mixins.maidmoreanimation.json"
         ])
     }
 }

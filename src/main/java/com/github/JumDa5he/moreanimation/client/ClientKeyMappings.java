@@ -9,7 +9,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import org.lwjgl.glfw.GLFW;
 
-@EventBusSubscriber(modid = MoreAnimation.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = MoreAnimation.MOD_ID, value = Dist.CLIENT)
 public final class ClientKeyMappings {
     public static final KeyMapping TAIL_INTERACTION = new KeyMapping(
             "key.moreanimation.tail_interaction",

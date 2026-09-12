@@ -14,11 +14,11 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import org.joml.Vector3f;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,8 +58,39 @@ public final class TailInteractionState {
     private static float lastSentYaw = Float.NaN;
     private static float lastSentPitch = Float.NaN;
     private static boolean lastSentOverstretch;
+    /** 手控时的松开宽限（毫秒）：手部识别会抖动，短暂辨认不出握拳不该立刻把尾巴甩开。 */
+    private static long virtualReleaseGraceMillis = 1000L;
+
+    /** 弹簧积分的最大子步长（单位：tick）。越小越接近连续解，0.05 相当于 400Hz 等效。 */
+    private static final float SUB_STEP_TICKS = 0.05f;
+    /** 从"没再识别到抓取"开始计时的时间戳，0 表示当前是按下状态。 */
+    private static long releaseGraceStart;
 
     private TailInteractionState() {
+    }
+
+    /**
+     * 每渲染帧推进一次尾巴弹簧。
+     *
+     * <p>以前是在 clientTick 里按 20Hz 固定步长积分，视觉上就是 20Hz 的台阶；
+     * 现在步长取本帧实际经过的 tick 数：20fps 时 step≈1（与原来完全一致），
+     * 60fps 时 step≈0.33，相当于把原来的一步拆成三步，动画就跟着渲染帧率走了。
+     */
+    @SubscribeEvent
+    public static void renderFrame(RenderFrameEvent.Pre event) {
+        if (POSES.isEmpty()) return;
+        float step = event.getPartialTick().getGameTimeDeltaTicks();
+        if (!Float.isFinite(step) || step <= 0.0f) return;
+        step = Math.min(step, 4.0f);   // 卡顿或切窗口回来时别一次跳太远
+        // 一帧的时间再切成 ≤0.05 tick 的小步（≥400Hz 等效）：
+        // 积分步长足够小，动画才既跟着渲染帧率走、又不会因为帧率变化而改变手感。
+        int subSteps = Math.max(1, Math.min(80, (int) Math.ceil(step / SUB_STEP_TICKS)));
+        float subStep = step / subSteps;
+        for (SmoothedPose pose : POSES.values()) {
+            for (int i = 0; i < subSteps; i++) {
+                pose.tick(subStep);
+            }
+        }
     }
 
     @SubscribeEvent
@@ -82,8 +113,8 @@ public final class TailInteractionState {
                     || !(mc.screen instanceof TailInteractionScreen)) {
                 requestStop();
             } else {
-                if (grabbed && GLFW.glfwGetMouseButton(mc.getWindow().getWindow(),
-                        GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS) {
+                // 有虚拟指针（手部追踪）时按它的抓取键状态判断，否则看真实鼠标左键
+                if (grabbed && canReleaseGrabNow(mc)) {
                     releaseGrab();
                 }
                 mc.options.keyUp.setDown(false);
@@ -105,7 +136,7 @@ public final class TailInteractionState {
                 pose.setInteraction(false, false);
                 pose.setTarget(0, 0, false);
             }
-            pose.tick();
+            // 弹簧推进挪到 renderFrame（按渲染帧率），这里只做状态清理
             if (entry.getKey() != maidId && pose.canDiscard()) iterator.remove();
         }
     }
@@ -208,11 +239,63 @@ public final class TailInteractionState {
 
     public static void releaseGrab() {
         if (!grabbed) return;
+        releaseGraceStart = 0L;
         grabbed = false;
         overstretchActive = false;
         SmoothedPose pose = POSES.get(maidId);
         if (pose != null) pose.setTarget(0, 0, false);
         sendPose(false);
+    }
+
+    /**
+     * 虚拟输入（手部追踪）每帧调用一次：按外部抓取键状态开始 / 结束抓取。
+     *
+     * <p>真实鼠标是「按下 -> mouseClicked」触发的，手部追踪没有鼠标事件，所以这里补上同样的边沿处理。
+     * 调用前应当已经用同一套坐标调用过 {@link #updatePointer(double, double)}。
+     */
+    public static void syncVirtualGrab(double mouseX, double mouseY) {
+        if (!TailInteractionInput.hasVirtualPointer()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (TailInteractionInput.isPrimaryDown(mc)) {
+            releaseGraceStart = 0L;
+            if (!grabbed) {
+                beginGrab(mouseX, mouseY);
+            }
+            return;
+        }
+        if (grabbed && canReleaseGrabNow(mc)) {
+            releaseGrab();
+        }
+    }
+
+    /** 改手控松开的宽限时间（毫秒），默认 1000。 */
+    public static void setVirtualReleaseGraceMillis(long millis) {
+        virtualReleaseGraceMillis = Math.max(0L, millis);
+    }
+
+    /**
+     * 现在能不能真的松开抓取。
+     *
+     * <p>真实鼠标：按下状态一消失就松开。
+     * 手控：只有「没再识别到抓取」持续超过 {@code virtualReleaseGraceMillis} 毫秒才松开，
+     * 期间手指抖动、手短暂离开画面都不会中断抓取。
+     */
+    private static boolean canReleaseGrabNow(Minecraft mc) {
+        if (TailInteractionInput.isPrimaryDown(mc)) {
+            releaseGraceStart = 0L;
+            return false;
+        }
+        if (!TailInteractionInput.hasVirtualPointer()) {
+            // 真实鼠标：立刻松开
+            releaseGraceStart = 0L;
+            return true;
+        }
+        long now = System.currentTimeMillis();
+        if (releaseGraceStart == 0L) {
+            releaseGraceStart = now;
+            return false;
+        }
+        return now - releaseGraceStart > virtualReleaseGraceMillis;
     }
 
     public static void updatePointer(double mouseX, double mouseY) {
@@ -480,7 +563,13 @@ public final class TailInteractionState {
             this.holding = holding;
         }
 
-        private void tick() {
+        /**
+         * 推进一帧弹簧。
+         *
+         * @param step 本次积分的步长（单位：tick）。由 {@link #renderFrame} 切成 ≤{@code SUB_STEP_TICKS}
+         *             的小步后调用，所以实际步长总是很小；{@code step == 1} 时等价于原来 20Hz 的固定步长。
+         */
+        private void tick(float step) {
             for (int i = 0; i < CHAIN_WEIGHTS.length; i++) {
                 float weightedYaw;
                 float weightedPitch;
@@ -490,22 +579,24 @@ public final class TailInteractionState {
                 } else {
                     float ratio = CHAIN_WEIGHTS[i] / CHAIN_WEIGHTS[i - 1];
                     weightedYaw = (currentYaw[i - 1]
-                            + velocityYaw[i - 1] * CHAIN_VELOCITY_TRANSFER[i]) * ratio;
+                            + velocityYaw[i - 1] * CHAIN_VELOCITY_TRANSFER[i] * step) * ratio;
                     weightedPitch = (currentPitch[i - 1]
-                            + velocityPitch[i - 1] * CHAIN_VELOCITY_TRANSFER[i]) * ratio;
+                            + velocityPitch[i - 1] * CHAIN_VELOCITY_TRANSFER[i] * step) * ratio;
                 }
                 float stiffness = CHAIN_STIFFNESS[i]
-                        * (holding ? 1.0f : RETURN_STIFFNESS_MULTIPLIER);
+                        * (holding ? 1.0f : RETURN_STIFFNESS_MULTIPLIER) * step;
                 velocityYaw[i] = (velocityYaw[i]
-                        + (weightedYaw - currentYaw[i]) * stiffness) * CHAIN_DAMPING[i];
+                        + (weightedYaw - currentYaw[i]) * stiffness)
+                        * (float) Math.pow(CHAIN_DAMPING[i], step);
                 velocityPitch[i] = (velocityPitch[i]
-                        + (weightedPitch - currentPitch[i]) * stiffness) * CHAIN_DAMPING[i];
+                        + (weightedPitch - currentPitch[i]) * stiffness)
+                        * (float) Math.pow(CHAIN_DAMPING[i], step);
                 float velocityLimit = MAX_ANGULAR_VELOCITY
                         * Math.max(0.35f, CHAIN_WEIGHTS[i] / CHAIN_WEIGHTS[0]);
                 velocityYaw[i] = Mth.clamp(velocityYaw[i], -velocityLimit, velocityLimit);
                 velocityPitch[i] = Mth.clamp(velocityPitch[i], -velocityLimit, velocityLimit);
-                currentYaw[i] += velocityYaw[i];
-                currentPitch[i] += velocityPitch[i];
+                currentYaw[i] += velocityYaw[i] * step;
+                currentPitch[i] += velocityPitch[i] * step;
                 if (!Float.isFinite(currentYaw[i]) || !Float.isFinite(currentPitch[i])
                         || !Float.isFinite(velocityYaw[i]) || !Float.isFinite(velocityPitch[i])) {
                     currentYaw[i] = currentPitch[i] = velocityYaw[i] = velocityPitch[i] = 0;

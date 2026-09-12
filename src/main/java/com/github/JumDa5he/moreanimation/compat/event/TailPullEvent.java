@@ -1,14 +1,15 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.network.CleanTailSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.network.TailPullSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Iterator;
@@ -26,8 +27,8 @@ public class TailPullEvent {
     private static final long COOLDOWN_TICKS = 20;
     /** 触发距离上限（格） */
     private static final double TRIGGER_DISTANCE = 4.5D;
-    /** 播放 cleantail 动画的时长（tick），动画本身 2.33 秒 ≈ 47 tick */
-    private static final long CLEANTAIL_ANIM_TICKS = 48;
+    /** 播放 cleantail 动画的时长（tick），动画本身 2.5 秒 = 50 tick，留 5 tick 缓冲保证播完整 */
+    private static final long CLEANTAIL_ANIM_TICKS = 55;
     /** 累计拉几次后触发一次 cleantail */
     private static final int PULLS_FOR_CLEANTAIL = 3;
 
@@ -59,24 +60,24 @@ public class TailPullEvent {
         if (dist > 0.01D) {
             double k = KNOCKBACK_SPEED / dist;
             maid.setDeltaMovement(dx * k, maid.getDeltaMovement().y + 0.2D, dz * k);
-            maid.hasImpulse = true;
+            maid.hurtMarked = true;
         }
 
         // 播放 tailpull 动画
         PENDING_ANIMS.put(maid.getUUID(), now + PULL_ANIM_TICKS);
         COOLDOWN_UNTIL.put(maid.getUUID(), now + COOLDOWN_TICKS);
+        MaidAnimationData.start(maid, "tailpull", (int) PULL_ANIM_TICKS,
+                MaidAnimationData.PRIORITY_INTERACTION, false);
         sendPullState(level, maid, true);
-        System.out.println("[MoreAnimation] tailpull triggered: " + maid.getUUID()
-                + " by " + player.getGameProfile().getName() + " at tick " + now);
 
-        // 累计拉 3 次后触发一次 cleantail
+        // 累计拉 5 次后触发一次 cleantail
         int count = PULL_COUNT.merge(maid.getUUID(), 1, Integer::sum);
         if (count >= PULLS_FOR_CLEANTAIL) {
             PULL_COUNT.remove(maid.getUUID());
             PENDING_CLEANTAIL.put(maid.getUUID(), now + CLEANTAIL_ANIM_TICKS);
+            MaidAnimationData.start(maid, "CLEANTAIL", (int) CLEANTAIL_ANIM_TICKS,
+                    MaidAnimationData.PRIORITY_INTERACTION, false);
             sendCleanTailState(level, maid, true);
-            System.out.println("[MoreAnimation] cleantail triggered after " + count
-                    + " pulls: " + maid.getUUID() + " at tick " + now);
         }
     }
 

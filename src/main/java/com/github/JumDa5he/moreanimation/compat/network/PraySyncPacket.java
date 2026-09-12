@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
-import com.github.JumDa5he.moreanimation.MaidMoreAnimation;
+import com.github.JumDa5he.moreanimation.MoreAnimation;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -15,7 +15,7 @@ public record PraySyncPacket(int entityId, boolean praying) implements CustomPac
     private static final String TAG_PRAY = "moreanimation_pray";
 
     public static final CustomPacketPayload.Type<PraySyncPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MaidMoreAnimation.MOD_ID, "pray"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "pray"));
 
     public static final StreamCodec<ByteBuf, PraySyncPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, PraySyncPacket::entityId,

@@ -1,20 +1,21 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.network.PraySyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -97,8 +98,9 @@ public class PrayEvent {
                 PENDING_ANIMS.put(maid.getUUID(), now + PRAY_ANIM_TICKS);
                 SHRINE_POS.put(maid.getUUID(), shrinePos);
                 freezeAndFace(maid, shrinePos);
+                MaidAnimationData.start(maid, "pray", (int) PRAY_ANIM_TICKS,
+                        MaidAnimationData.PRIORITY_INTERACTION, true);
                 sendPrayState(level, maid, true);
-                System.out.println("[MoreAnimation] pray triggered: " + maid.getUUID() + " at " + shrinePos);
             }
         }
     }

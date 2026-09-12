@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
-import com.github.JumDa5he.moreanimation.MaidMoreAnimation;
+import com.github.JumDa5he.moreanimation.MoreAnimation;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -15,7 +15,7 @@ public record KowtowSyncPacket(int entityId, boolean kowtowing) implements Custo
     private static final String TAG_KOWTOW = "moreanimation_kowtow";
 
     public static final CustomPacketPayload.Type<KowtowSyncPacket> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MaidMoreAnimation.MOD_ID, "kowtow"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "kowtow"));
 
     public static final StreamCodec<ByteBuf, KowtowSyncPacket> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, KowtowSyncPacket::entityId,

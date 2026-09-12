@@ -1,0 +1,23 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "moreanimation_keep_human": {
+      "loop": true,
+      "bones": {
+        "AllBody": { "scale": [1, 1, 1] },
+        "MAllBody": { "scale": [1, 1, 1] },
+        "MAllbody": { "scale": [1, 1, 1] },
+        "FOX": { "scale": [0, 0, 0] }
+      }
+    },
+    "moreanimation_force_fox": {
+      "loop": true,
+      "bones": {
+        "AllBody": { "scale": [0, 0, 0] },
+        "MAllBody": { "scale": [0, 0, 0] },
+        "MAllbody": { "scale": [0, 0, 0] },
+        "FOX": { "scale": [1, 1, 1] }
+      }
+    }
+  }
+}

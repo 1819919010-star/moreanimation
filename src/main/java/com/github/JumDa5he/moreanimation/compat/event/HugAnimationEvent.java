@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.compat.event;
 
-import com.github.JumDa5he.moreanimation.MaidMoreAnimation;
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
+import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.network.HuggingSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.resources.ResourceKey;
@@ -8,9 +9,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Iterator;
@@ -18,7 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@EventBusSubscriber(modid = MaidMoreAnimation.MOD_ID)
+@EventBusSubscriber(modid = "moreanimation")
 public class HugAnimationEvent {
     /** 触发拥抱的距离（格） */
     private static final double TRIGGER_DISTANCE = 0.7D;
@@ -69,11 +70,6 @@ public class HugAnimationEvent {
             long elapsed = now - start;
 
             if (broken) {
-                System.out.println("[MoreAnimation] hug session broken: " + maidUuid
-                        + " maid=" + (maid == null ? "NULL" : "alive=" + maid.isAlive())
-                        + " partner=" + (partner == null ? "NULL" : "alive=" + partner.isAlive())
-                        + " distSqr=" + (maid != null && partner != null ? String.format("%.2f", maid.distanceToSqr(partner)) : "-1")
-                        + " elapsed=" + elapsed);
                 setHugState(level, maidUuid, false);
                 HUG_PARTNERS.remove(maidUuid);
                 HUG_LEVELS.remove(maidUuid);
@@ -88,7 +84,6 @@ public class HugAnimationEvent {
 
             if (elapsed >= PRE_HOLD_TICKS + HUG_ANIM_TICKS) {
                 // 会话结束：恢复正常
-                System.out.println("[MoreAnimation] hug session finished: " + maidUuid);
                 setHugState(level, maidUuid, false);
                 HUG_PARTNERS.remove(maidUuid);
                 HUG_LEVELS.remove(maidUuid);
@@ -101,11 +96,7 @@ public class HugAnimationEvent {
             freezeAndFace(maid, partner);
         }
 
-        // 2. 扫描新对：两个女仆距离 < 1 格，且双方都不在拥抱/冷却中
-        if (level.getGameTime() % 5 != 0) {
-            return;
-        }
-        scanNewPairs(level, now);
+        // 新拥抱只由动作控制终端触发；保留旧会话维护代码以兼容存量会话。
     }
 
     private static void scanNewPairs(ServerLevel level, long now) {
@@ -137,7 +128,6 @@ public class HugAnimationEvent {
     }
 
     private static void startHug(ServerLevel level, EntityMaid a, EntityMaid b, long now) {
-        System.out.println("[MoreAnimation] hug session start: " + a.getUUID() + " <-> " + b.getUUID() + " at tick " + now);
         HUG_START_TIMES.put(a.getUUID(), now);
         HUG_START_TIMES.put(b.getUUID(), now);
         HUG_PARTNERS.put(a.getUUID(), b.getUUID());
@@ -179,6 +169,12 @@ public class HugAnimationEvent {
         }
         HUG_SENT_STATE.put(maidUuid, hugging);
         if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
+            if (hugging) {
+                MaidAnimationData.start(maid, "hugtogether", (int) HUG_ANIM_TICKS,
+                        MaidAnimationData.PRIORITY_INTERACTION, true);
+            } else if ("hugtogether".equals(MaidAnimationData.activeAction(maid))) {
+                MaidAnimationData.stop(maid);
+            }
             PacketDistributor.sendToPlayersTrackingEntity(maid, new HuggingSyncPacket(maid.getId(), hugging));
         }
         if (!hugging) {

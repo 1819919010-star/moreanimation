@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.mixin;
 
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
+import com.github.JumDa5he.moreanimation.client.TailInteractionState;
 import com.github.tartaricacid.touhoulittlemaid.client.entity.GeckoMaidEntity;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.controller.AnimationController;
@@ -21,6 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.List;
 import java.util.Set;
 
+/** Makes custom expression/interaction layers exclusive only for bones they animate. */
 @Mixin(AnimationProcessor.class)
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AnimationProcessorMixin {
@@ -37,6 +39,11 @@ public class AnimationProcessorMixin {
             expressionSeven.setScaleX(0);
             expressionSeven.setScaleY(0);
             expressionSeven.setScaleZ(0);
+        }
+        Object animatable = event.getAnimatableEntity();
+        if (animatable instanceof GeckoMaidEntity<?> gecko
+                && gecko.getMaid().asEntity() instanceof EntityMaid maid) {
+            TailInteractionState.applyGecko((AnimationProcessor) (Object) this, maid);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.compat.ysm;
 
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
+import com.github.JumDa5he.moreanimation.client.TailInteractionState;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
@@ -18,10 +19,17 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+/**
+ * Version-pinned runtime bridge. Official YSM's MixinTweaker loads the old
+ * YsmAnimatableMixin target during config selection, so the active hook lives
+ * in the later-loaded YSM renderer instead.
+ * No YSM classes occur in JVM descriptors or imports.
+ */
 @EventBusSubscriber(modid = "moreanimation", value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";
+    /** Every common animation that current Java code can actually select. */
     private static final Set<String> SUPPORTED_ACTIONS = Set.of(
             "circledance", "!??!", "come", "come2", "weidu", "ha", "tastetail", "eattail", "sleep2", "situp",
             "sit2", "moresleep4", "moresleep6", "cold_hug_shiver", "ground_hurt",
@@ -30,14 +38,18 @@ public final class YsmAnimationBridge {
             "pet_other_head_raise", "hugtogether", "morebeg", "catchbyhook", "hurt", "kowtow",
             "drowning", "pray", "watchtombstone", "CLEANTAIL", "game_lost2", "tailcircle", "tailpull",
             "ear_pull_left", "ear_pull_right", "hang", "dance1", "lips");
+    /** Persistent terminal expressions played independently from the main action. */
     private static final Set<String> SUPPORTED_EXPRESSIONS = Set.of(
             "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang");
+    /** YSM already lowers its model for a sitting maid; keep that computed root height for seated clips. */
     private static final Set<String> SEATED_ACTIONS = Set.of(
             "come2", "weidu", "ha", "tastetail", "eattail", "sit2");
+    /** Per-clip YSM bed-axis correction; values are applied in YSM's final bone coordinate system. */
     private static final Map<String, Float> SLEEP_YAW_CORRECTIONS = Map.of(
             "moresleep4", (float) Math.toRadians(-90.0));
     private static final Set<String> ROOT_POSITION_BONES = Set.of(
             "root", "mroot", "mallbody", "allbody");
+    /** Body gesture channels embedded in expression clips are excluded from the YSM overlay. */
     private static final Set<String> EXPRESSION_BONES = Set.of(
             "Head", "AllHead", "EyeBrow", "RightEyebrow", "LeftEyebrow",
             "RightEyelid", "LeftEyelid", "RightEyelidBase", "LeftEyelidBase",
@@ -109,6 +121,7 @@ public final class YsmAnimationBridge {
         }
     }
 
+    /** Restore before YSM evaluates or reuses its cached pose, including after stop/switch. */
     public static void before(Object animatable) {
         List<Saved> saved = SAVED.remove(animatable);
         if (saved == null) return;
@@ -163,9 +176,16 @@ public final class YsmAnimationBridge {
 
             boolean applyAction = SUPPORTED_ACTIONS.contains(action);
             boolean applyExpression = SUPPORTED_EXPRESSIONS.contains(expression);
-            if (!applyAction && !applyExpression) return;
+            boolean tailExclusive = TailInteractionState.isInteractionActive(maid.getId());
+            if (tailExclusive) {
+                applyAction = false;
+                applyExpression = false;
+            }
+            TailInteractionState.PoseSnapshot tailPose = TailInteractionState.poseFor(maid.getId());
+            boolean applyTail = tailPose != null;
+            if (!applyAction && !applyExpression && !applyTail && !tailExclusive) return;
             var resources = Minecraft.getInstance().getResourceManager();
-            if (clips.isEmpty() || resourceManager != resources) {
+            if ((applyAction || applyExpression) && (clips.isEmpty() || resourceManager != resources)) {
                 try (var reader = new InputStreamReader(resources.open(ResourceLocation.fromNamespaceAndPath(
                         "moreanimation", "animation/unknown.animation.json")), StandardCharsets.UTF_8)) {
                     clips = YsmAnimationClip.read(reader, CLIP_NAMES);
@@ -201,6 +221,9 @@ public final class YsmAnimationBridge {
             Set<String> missingBones = actionChanged ? new LinkedHashSet<>() : null;
             Set<String> missingExpressionBones = expressionChanged ? new LinkedHashSet<>() : null;
             SAVED.put(animatable, saved); // Also permits rollback if an invocation fails midway.
+            if (tailExclusive) {
+                applyTailExclusiveBase(TailInteractionState.usesSittingBase(maid.getId()), byName, saved);
+            }
             if (applyAction) {
                 YsmAnimationClip clip = clips.get(action);
                 double elapsedSeconds = (now - actionStart + partialTick) / 20.0;
@@ -215,6 +238,7 @@ public final class YsmAnimationBridge {
                 applyClip(expression, clip, Math.max(0, elapsedSeconds) % clip.length,
                         byName, byNormalizedName, saved, missingExpressionBones, true);
             }
+            if (applyTail) applyProceduralTail(tailPose, byName, saved);
             if (actionChanged) {
                 LOG.debug("YSM animation action {} applied {} bone components to maid {}",
                         action, saved.size(), maid.getUUID());
@@ -230,6 +254,44 @@ public final class YsmAnimationBridge {
         } catch (Exception | LinkageError e) {
             before(animatable);
             fail(e);
+        }
+    }
+
+    private static void applyProceduralTail(TailInteractionState.PoseSnapshot pose,
+                                            Map<String, Object> byName,
+                                            List<Saved> saved) throws ReflectiveOperationException {
+        for (Map.Entry<String, Object> entry : byName.entrySet()) {
+            int segment = TailInteractionState.segmentForBone(entry.getKey());
+            if (segment < 0) continue;
+            Object bone = entry.getValue();
+            float rotationX = ((Number) GET[0].invoke(bone)).floatValue();
+            float rotationY = ((Number) GET[1].invoke(bone)).floatValue();
+            float rotationZ = ((Number) GET[2].invoke(bone)).floatValue();
+            saved.add(new Saved(bone, 0, rotationX));
+            saved.add(new Saved(bone, 1, rotationY));
+            saved.add(new Saved(bone, 2, rotationZ));
+            float yaw = pose.yawForSegment(segment);
+            float pitch = pose.pitchForSegment(segment);
+            SET[0].invoke(bone, rotationX - pitch);
+            SET[1].invoke(bone, rotationY - yaw);
+            SET[2].invoke(bone, rotationZ - yaw * 0.08f);
+        }
+    }
+
+    private static void applyTailExclusiveBase(boolean sitting, Map<String, Object> byName,
+                                               List<Saved> saved) throws ReflectiveOperationException {
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Map.Entry<String, Object> entry : byName.entrySet()) {
+            Object bone = entry.getValue();
+            if (!visited.add(bone)) continue;
+            boolean tailBone = TailInteractionState.segmentForBone(entry.getKey()) >= 0;
+            if (sitting && !tailBone) continue;
+            Vector3f initial = (Vector3f) bind.invoke(bone);
+            for (int axis = 0; axis < 3; axis++) {
+                float current = ((Number) GET[axis].invoke(bone)).floatValue();
+                saved.add(new Saved(bone, axis, current));
+                SET[axis].invoke(bone, initial.get(axis));
+            }
         }
     }
 
@@ -254,6 +316,8 @@ public final class YsmAnimationBridge {
                     && ROOT_POSITION_BONES.contains(channel.bone().toLowerCase(Locale.ROOT))
                     ? SLEEP_YAW_CORRECTIONS.get(animation) : null;
             for (int axis = 0; axis < 3; axis++) {
+                // Gecko seated clips contain their own downward root translation. YSM's pose calculation has
+                // already lowered a sitting maid, so applying the Y component again embeds the model in terrain.
                 if (preserveSeatHeight && axis == 1) continue;
                 int component = channel.offset() + axis;
                 saved.add(new Saved(bone, component, ((Number) GET[component].invoke(bone)).floatValue()));

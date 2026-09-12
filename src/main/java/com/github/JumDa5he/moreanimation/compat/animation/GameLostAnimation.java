@@ -556,8 +556,17 @@ public class GameLostAnimation {
             });
     }
 
+    /** Publishes legacy Gecko conditions through the shared state consumed by Gecko and YSM. */
     public static void serverTick(EntityMaid maid) {
         if (maid.level().isClientSide() || !maid.isAlive()) return;
+        if (MaidAnimationData.isTailInteractionActive(maid)) {
+            UUID uuid = maid.getUUID();
+            SCHEDULED.remove(uuid);
+            basePoseSelections.remove(uuid);
+            tasteStartTick.remove(uuid);
+            clearManaged(maid);
+            return;
+        }
 
         tickTimedConditions(maid);
         Desired desired = desiredContinuousAction(maid);
@@ -701,6 +710,7 @@ public class GameLostAnimation {
         return null;
     }
 
+    /** Select once when entering the real TLM sit/sleep state; an empty action keeps the original pose. */
     private static String selectedBasePoseAction(EntityMaid maid) {
         String state = maid.isSleeping() ? "sleep" : maid.isMaidInSittingPose() ? "sit" : "";
         UUID uuid = maid.getUUID();
@@ -721,6 +731,7 @@ public class GameLostAnimation {
         return selected.action().isEmpty() ? null : selected.action();
     }
 
+    /** Five uninterrupted seconds in powder snow are required; leaving it resets the accumulation. */
     private static boolean tickColdExposure(EntityMaid maid) {
         net.minecraft.core.BlockPos feet = maid.blockPosition();
         boolean cold = maid.level().getBlockState(feet).is(net.minecraft.world.level.block.Blocks.POWDER_SNOW)
@@ -876,6 +887,10 @@ public class GameLostAnimation {
      */
     public static String scheduledAnim(EntityMaid entity, String state) {
         UUID uuid = entity.getUUID();
+        if (MaidAnimationData.isTailInteractionActive(entity)) {
+            SCHEDULED.remove(uuid);
+            return null;
+        }
         if ("sleep".equals(state) && !MaidAnimationData.randomSleepPose(entity)) {
             Scheduled current = SCHEDULED.get(uuid);
             if (current != null && current.state.equals(state)) SCHEDULED.remove(uuid);
@@ -890,6 +905,8 @@ public class GameLostAnimation {
             }
             SCHEDULED.remove(uuid);
         }
+        // Existing schedules must remain visible while their shared action is active.
+        // Checking this before SCHEDULED caused a stop/restart every other tick.
         String activeAction = MaidAnimationData.activeAction(entity);
         if (!activeAction.isEmpty() && !BASE_POSE_ACTIONS.contains(activeAction)) return null;
         long interval = MoreAnimationConfig.getIntervalTicks(state);

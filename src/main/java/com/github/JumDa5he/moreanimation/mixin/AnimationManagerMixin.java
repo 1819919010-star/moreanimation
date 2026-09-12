@@ -2,6 +2,7 @@ package com.github.JumDa5he.moreanimation.mixin;
 
 import com.github.JumDa5he.moreanimation.compat.animation.GameLostAnimation;
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
+import com.github.JumDa5he.moreanimation.client.TailInteractionState;
 import com.github.tartaricacid.touhoulittlemaid.api.entity.IMaid;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationManager;
 import com.github.tartaricacid.touhoulittlemaid.client.entity.GeckoMaidEntity;
@@ -9,6 +10,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.PlayState;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.builder.AnimationBuilder;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.builder.ILoopType;
+import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.controller.AnimationController;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.event.predicate.AnimationEvent;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.resource.GeckoLibCache;
 import net.minecraft.core.BlockPos;
@@ -25,6 +27,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.WeakHashMap;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Mixin(AnimationManager.class)
@@ -37,6 +41,9 @@ public class AnimationManagerMixin {
     private static final Map<UUID, Long> lipsCooldown = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> forcedActionStart = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> interactionActionStart = new ConcurrentHashMap<>();
+    private static final Map<AnimationController<?>, Double> tailExclusiveSpeeds =
+            Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<UUID, Boolean> tailExclusiveBases = new ConcurrentHashMap<>();
     /** Expressions and paired interactions are the only custom actions allowed to overlay TLM. */
     @Inject(method = "predicateParallel", at = @At("HEAD"), remap = false, cancellable = true)
     private void onPredicateParallel(AnimationEvent<GeckoMaidEntity<?>> event, String animationName,
@@ -45,6 +52,11 @@ public class AnimationManagerMixin {
         if (maid == null) return;
         EntityMaid entity = (EntityMaid) maid.asEntity();
         UUID uuid = entity.getUUID();
+        if (TailInteractionState.isInteractionActive(entity.getId()) && !"parallel5".equals(animationName)) {
+            cir.setReturnValue(PlayState.STOP);
+            cir.cancel();
+            return;
+        }
         if ("parallel5".equals(animationName)) {
             String formAnimation = MaidAnimationData.shouldForceFox(entity)
                     ? "moreanimation_force_fox"
@@ -81,6 +93,7 @@ public class AnimationManagerMixin {
         }
     }
 
+    /** Full-body forced actions replace TLM MAIN instead of being blended into it. */
     @Inject(method = "predicateMain", at = @At("HEAD"), remap = false, cancellable = true)
     private void onPredicateMain(AnimationEvent<GeckoMaidEntity<?>> event,
                                  CallbackInfoReturnable<PlayState> cir) {
@@ -88,6 +101,26 @@ public class AnimationManagerMixin {
         if (maid == null) return;
         EntityMaid entity = (EntityMaid) maid.asEntity();
         UUID uuid = entity.getUUID();
+        AnimationController<?> controller = event.getController();
+        if (TailInteractionState.isInteractionActive(entity.getId())) {
+            boolean sitting = TailInteractionState.usesSittingBase(entity.getId());
+            Double previousSpeed = tailExclusiveSpeeds.putIfAbsent(controller, controller.getAnimationSpeed());
+            Boolean previousBase = tailExclusiveBases.put(uuid, sitting);
+            if (previousSpeed == null || previousBase == null || previousBase != sitting) {
+                controller.markNeedsReload();
+            }
+            controller.setAnimationSpeed(0.0D);
+            cir.setReturnValue(play(event, sitting ? "sit" : "idle", ILoopType.EDefaultLoopTypes.LOOP)
+                    ? PlayState.CONTINUE : PlayState.STOP);
+            cir.cancel();
+            return;
+        }
+        Double originalSpeed = tailExclusiveSpeeds.remove(controller);
+        if (originalSpeed != null) {
+            controller.setAnimationSpeed(originalSpeed);
+            controller.markNeedsReload();
+        }
+        tailExclusiveBases.remove(uuid);
         String action = MaidAnimationData.activeAction(entity);
         if (action.isEmpty() && entity.getPersistentData().getBoolean("moreanimation_tailpull")) action = "tailpull";
         if (action.isEmpty() || MaidAnimationData.isParallelAction(action)) {
@@ -112,6 +145,12 @@ public class AnimationManagerMixin {
         if (maid == null) return;
         EntityMaid entity = (EntityMaid) maid.asEntity();
         UUID uuid = entity.getUUID();
+        if (TailInteractionState.isInteractionActive(entity.getId())) {
+            GameLostAnimation.releaseMisc(uuid);
+            cir.setReturnValue(PlayState.STOP);
+            cir.cancel();
+            return;
+        }
         if (GameLostAnimation.isMiscBlocked(uuid)) return;
 
         boolean tailCut = entity.getPersistentData().getBoolean("moreanimation_tailCut");
@@ -298,6 +337,18 @@ public class AnimationManagerMixin {
         }
         // 无 MISC 动画播放时释放占用
         GameLostAnimation.releaseMisc(uuid);
+    }
+
+    @Inject(method = {"predicateOffhandHold", "predicateMainhandHold", "predicateSwing", "predicateUse",
+            "predicatePassengerAnimation", "predicateMagicCastingAnimation"},
+            at = @At("HEAD"), remap = false, cancellable = true)
+    private void moreanimation$suppressTailInteractionControllers(AnimationEvent<GeckoMaidEntity<?>> event,
+                                                                   CallbackInfoReturnable<PlayState> cir) {
+        IMaid maid = event.getAnimatableEntity().getMaid();
+        if (maid != null && TailInteractionState.isInteractionActive(maid.asEntity().getId())) {
+            cir.setReturnValue(PlayState.STOP);
+            cir.cancel();
+        }
     }
 
     /** 周围 2 格内是否有蛋糕方块（每 20 tick 缓存扫描一次） */

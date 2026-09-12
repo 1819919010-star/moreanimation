@@ -72,5 +72,17 @@
   "gui.moreanimation.interaction.cooldown": "Automatic interaction cooldown: 1 minute",
   "gui.moreanimation.form.auto": "Current form: Automatic",
   "gui.moreanimation.form.human": "Current form: Human",
-  "gui.moreanimation.form.fox": "Current form: Fox"
+  "gui.moreanimation.form.fox": "Current form: Fox",
+  "key.categories.moreanimation": "More Animation",
+  "key.moreanimation.tail_interaction": "Drag Maid Tail",
+  "gui.moreanimation.tail_interaction": "Tail Interaction",
+  "gui.moreanimation.tail_interaction.hint": "Click and drag the tail area; press V or ESC to exit",
+  "message.moreanimation.no_tail_target": "No interactable maid nearby",
+  "bubble.moreanimation.tail_overstretch.1": "Please don't pull so hard... my tail might break...",
+  "bubble.moreanimation.tail_overstretch.2": "Ouch! Please be gentler!",
+  "bubble.moreanimation.tail_overstretch.3": "You're going to pull my tail off...",
+  "bubble.moreanimation.tail_overstretch.4": "Ow... don't pull it any farther that way!",
+  "bubble.moreanimation.tail_overstretch.5": "Gently... that really hurts...",
+  "bubble.moreanimation.tail_overstretch.6": "W-wait... that isn't how you play with a tail...",
+  "bubble.moreanimation.tail_overstretch.7": "Please... it'll really break if you keep pulling..."
 }

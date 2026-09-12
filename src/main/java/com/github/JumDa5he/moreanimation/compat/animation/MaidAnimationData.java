@@ -18,7 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/** Per-maid animation preferences and the lightweight special-action lock. */
 public final class MaidAnimationData {
+    public static final String TAIL_INTERACTION_ACTIVE = "moreanimation_tail_drag_active";
     private static final String ENABLED_PREFIX = "moreanimation_enabled_";
     private static final String ACTIVE = "moreanimation_active_action";
     private static final String ACTIVE_UNTIL = "moreanimation_active_until";
@@ -196,6 +198,7 @@ public final class MaidAnimationData {
     public static boolean start(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
         long now = maid.level().getGameTime();
         CompoundTag data = maid.getPersistentData();
+        if (data.getBoolean(TAIL_INTERACTION_ACTIVE) && priority < PRIORITY_DEATH) return false;
         if (isActive(maid) && data.getInt(ACTIVE_PRIORITY) > priority) return false;
         data.putString(ACTIVE, action);
         data.putLong(ACTIVE_START, now);
@@ -264,6 +267,10 @@ public final class MaidAnimationData {
 
     public static int activePriority(EntityMaid maid) {
         return isActive(maid) ? maid.getPersistentData().getInt(ACTIVE_PRIORITY) : Integer.MIN_VALUE;
+    }
+
+    public static boolean isTailInteractionActive(EntityMaid maid) {
+        return maid.getPersistentData().getBoolean(TAIL_INTERACTION_ACTIVE);
     }
 
     public static void serverTick(EntityMaid maid) {

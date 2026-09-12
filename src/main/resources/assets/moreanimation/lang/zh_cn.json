@@ -72,5 +72,17 @@
   "gui.moreanimation.interaction.cooldown": "自动互动冷却：1 分钟",
   "gui.moreanimation.form.auto": "当前形态：自动",
   "gui.moreanimation.form.human": "当前形态：人形",
-  "gui.moreanimation.form.fox": "当前形态：狐形"
+  "gui.moreanimation.form.fox": "当前形态：狐形",
+  "key.categories.moreanimation": "更多动作",
+  "key.moreanimation.tail_interaction": "拖拽女仆尾巴",
+  "gui.moreanimation.tail_interaction": "尾巴互动",
+  "gui.moreanimation.tail_interaction.hint": "点击尾巴区域并拖动；按 V 或 ESC 退出",
+  "message.moreanimation.no_tail_target": "附近没有可交互的女仆",
+  "bubble.moreanimation.tail_overstretch.1": "呜呜……别这么用力，尾巴会断的……",
+  "bubble.moreanimation.tail_overstretch.2": "疼疼疼！轻一点呀！",
+  "bubble.moreanimation.tail_overstretch.3": "尾巴要被你拽掉了……",
+  "bubble.moreanimation.tail_overstretch.4": "呜……不要再往那边拉了！",
+  "bubble.moreanimation.tail_overstretch.5": "轻一点……真的很疼的……",
+  "bubble.moreanimation.tail_overstretch.6": "等、等等……尾巴不是这么玩的呀……",
+  "bubble.moreanimation.tail_overstretch.7": "呜呜……再拉就真的要断掉了……"
 }

@@ -16,24 +16,38 @@ import java.util.Set;
 import java.util.TreeMap;
 
 public final class YsmAnimationClip {
-    private record Keyframe(float[] value, boolean catmullRom) {}
+    private record Keyframe(YsmKeyframeExpression.Value[] value, boolean catmullRom) {
+        float[] sample(YsmKeyframeExpression.Context context) {
+            float[] result = new float[3];
+            for (int axis = 0; axis < 3; axis++) {
+                result[axis] = (float) value[axis].get(context);
+                if (!Float.isFinite(result[axis])) throw new IllegalArgumentException("Non-finite evaluated keyframe");
+            }
+            return result;
+        }
+    }
 
     public record Channel(String bone, int offset, NavigableMap<Double, Keyframe> keys) {
         public float[] sample(double seconds) {
+            return sample(seconds, 20, 20);
+        }
+
+        public float[] sample(double seconds, double health, double maxHealth) {
+            var context = new YsmKeyframeExpression.Context(seconds, health, maxHealth);
             var left = keys.floorEntry(seconds);
             var right = keys.ceilingEntry(seconds);
-            if (left == null) return keys.firstEntry().getValue().value().clone();
-            if (right == null) return keys.lastEntry().getValue().value().clone();
-            if (left.getKey().equals(right.getKey())) return left.getValue().value().clone();
+            if (left == null) return keys.firstEntry().getValue().sample(context);
+            if (right == null) return keys.lastEntry().getValue().sample(context);
+            if (left.getKey().equals(right.getKey())) return left.getValue().sample(context);
             double fraction = (seconds - left.getKey()) / (right.getKey() - left.getKey());
-            float[] leftValue = left.getValue().value();
-            float[] rightValue = right.getValue().value();
+            float[] leftValue = left.getValue().sample(context);
+            float[] rightValue = right.getValue().sample(context);
             float[] result = new float[3];
             if (left.getValue().catmullRom() || right.getValue().catmullRom()) {
                 var before = keys.lowerEntry(left.getKey());
                 var after = keys.higherEntry(right.getKey());
-                float[] p0 = before == null ? leftValue : before.getValue().value();
-                float[] p3 = after == null ? rightValue : after.getValue().value();
+                float[] p0 = before == null ? leftValue : before.getValue().sample(context);
+                float[] p3 = after == null ? rightValue : after.getValue().sample(context);
                 double squared = fraction * fraction;
                 double cubed = squared * fraction;
                 for (int axis = 0; axis < 3; axis++) {
@@ -65,12 +79,22 @@ public final class YsmAnimationClip {
     }
 
     public static Map<String, YsmAnimationClip> read(Reader reader, Set<String> actions) {
+        return read(reader, actions, (action, error) -> { throw error; });
+    }
+
+    /** A bad clip must not prevent valid clips or procedural poses from being consumed. */
+    public static Map<String, YsmAnimationClip> read(Reader reader, Set<String> actions,
+            java.util.function.BiConsumer<String, RuntimeException> onError) {
         JsonObject animations = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonObject("animations");
         Map<String, YsmAnimationClip> clips = new LinkedHashMap<>();
         for (String action : actions) {
-            JsonObject clip = animations.getAsJsonObject(action);
-            if (clip == null) throw new IllegalArgumentException("Missing animation: " + action);
-            clips.put(action, parse(action, clip));
+            try {
+                JsonObject clip = animations.getAsJsonObject(action);
+                if (clip == null) throw new IllegalArgumentException("Missing animation: " + action);
+                clips.put(action, parse(action, clip));
+            } catch (RuntimeException error) {
+                onError.accept(action, error);
+            }
         }
         return Map.copyOf(clips);
     }
@@ -151,22 +175,26 @@ public final class YsmAnimationClip {
         return new Keyframe(vector(action, object.get("post")), true);
     }
 
-    private static float[] vector(String action, JsonElement element) {
-        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()) {
-            float scalar = element.getAsFloat();
-            if (!Float.isFinite(scalar)) throw new IllegalArgumentException("Non-finite keyframe in " + action);
-            return new float[]{scalar, scalar, scalar};
+    private static YsmKeyframeExpression.Value[] vector(String action, JsonElement element) {
+        if (element.isJsonPrimitive()) {
+            var scalar = value(action, element);
+            return new YsmKeyframeExpression.Value[]{scalar, scalar, scalar};
         }
         JsonArray array = element.getAsJsonArray();
-        if (array.size() != 3) throw new IllegalArgumentException("Expected numeric XYZ vector in " + action);
-        float[] value = new float[3];
-        for (int axis = 0; axis < 3; axis++) {
-            if (!array.get(axis).isJsonPrimitive() || !array.get(axis).getAsJsonPrimitive().isNumber()) {
-                throw new IllegalArgumentException("Molang / complex keyframe in " + action);
-            }
-            value[axis] = array.get(axis).getAsFloat();
-            if (!Float.isFinite(value[axis])) throw new IllegalArgumentException("Non-finite keyframe in " + action);
+        if (array.size() != 3) throw new IllegalArgumentException("Expected XYZ vector in " + action);
+        return new YsmKeyframeExpression.Value[]{value(action, array.get(0)),
+                value(action, array.get(1)), value(action, array.get(2))};
+    }
+
+    private static YsmKeyframeExpression.Value value(String action, JsonElement element) {
+        if (!element.isJsonPrimitive()) throw new IllegalArgumentException("Complex keyframe in " + action);
+        var primitive = element.getAsJsonPrimitive();
+        if (primitive.isNumber()) {
+            float constant = primitive.getAsFloat();
+            if (!Float.isFinite(constant)) throw new IllegalArgumentException("Non-finite keyframe in " + action);
+            return context -> constant;
         }
-        return value;
+        if (primitive.isString()) return YsmKeyframeExpression.compile(primitive.getAsString());
+        throw new IllegalArgumentException("Invalid keyframe in " + action);
     }
 }

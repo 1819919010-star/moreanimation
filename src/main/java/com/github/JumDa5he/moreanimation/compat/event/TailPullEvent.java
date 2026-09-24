@@ -7,7 +7,11 @@ import com.github.JumDa5he.moreanimation.compat.network.TailPullSyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
@@ -40,6 +44,8 @@ public class TailPullEvent {
     private static final Map<UUID, Long> PENDING_CLEANTAIL = new ConcurrentHashMap<>();
     /** maidUuid -> 累计被拉次数 */
     private static final Map<UUID, Integer> PULL_COUNT = new ConcurrentHashMap<>();
+    /** maidUuid -> 临时拉尾状态所在维度 */
+    private static final Map<UUID, ResourceKey<Level>> ACTIVE_DIMENSIONS = new ConcurrentHashMap<>();
 
     /**
      * 由 TailPullTriggerPacket 调用（服务端线程）。
@@ -66,6 +72,7 @@ public class TailPullEvent {
         // 播放 tailpull 动画
         PENDING_ANIMS.put(maid.getUUID(), now + PULL_ANIM_TICKS);
         COOLDOWN_UNTIL.put(maid.getUUID(), now + COOLDOWN_TICKS);
+        ACTIVE_DIMENSIONS.put(maid.getUUID(), level.dimension());
         MaidAnimationData.start(maid, "tailpull", (int) PULL_ANIM_TICKS,
                 MaidAnimationData.PRIORITY_INTERACTION, false);
         sendPullState(level, maid, true);
@@ -93,11 +100,13 @@ public class TailPullEvent {
         while (it.hasNext()) {
             Map.Entry<UUID, Long> entry = it.next();
             UUID maidUuid = entry.getKey();
+            if (!level.dimension().equals(ACTIVE_DIMENSIONS.get(maidUuid))) continue;
             if (now >= entry.getValue()) {
                 it.remove();
                 if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
                     sendPullState(level, maid, false);
                 }
+                clearDimensionIfIdle(maidUuid);
             }
         }
 
@@ -105,13 +114,41 @@ public class TailPullEvent {
         while (ct.hasNext()) {
             Map.Entry<UUID, Long> entry = ct.next();
             UUID maidUuid = entry.getKey();
+            if (!level.dimension().equals(ACTIVE_DIMENSIONS.get(maidUuid))) continue;
             if (now >= entry.getValue()) {
                 ct.remove();
                 if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
                     sendCleanTailState(level, maid, false);
                 }
+                clearDimensionIfIdle(maidUuid);
             }
         }
+    }
+
+    private static void clearDimensionIfIdle(UUID maidUuid) {
+        if (!PENDING_ANIMS.containsKey(maidUuid) && !PENDING_CLEANTAIL.containsKey(maidUuid)) {
+            ACTIVE_DIMENSIONS.remove(maidUuid);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onEntityLeave(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide() || !(event.getEntity() instanceof EntityMaid maid)) return;
+        UUID id = maid.getUUID();
+        PENDING_ANIMS.remove(id);
+        PENDING_CLEANTAIL.remove(id);
+        COOLDOWN_UNTIL.remove(id);
+        PULL_COUNT.remove(id);
+        ACTIVE_DIMENSIONS.remove(id);
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        PENDING_ANIMS.clear();
+        PENDING_CLEANTAIL.clear();
+        COOLDOWN_UNTIL.clear();
+        PULL_COUNT.clear();
+        ACTIVE_DIMENSIONS.clear();
     }
 
     private static boolean isCooldown(EntityMaid maid, long now) {

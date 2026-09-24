@@ -26,6 +26,7 @@ public class MoreAnimationConfig {
     public static ForgeConfigSpec.BooleanValue WINEFOX_LOW_HEALTH_FOX;
     public static ForgeConfigSpec.BooleanValue AUTO_PET_DEFAULT;
     public static ForgeConfigSpec.BooleanValue AUTO_HUG_DEFAULT;
+    public static ForgeConfigSpec.BooleanValue ENABLE_OWNER_APPROACH_BOW;
 
     public static final ForgeConfigSpec SPEC;
 
@@ -45,6 +46,8 @@ public class MoreAnimationConfig {
                 .define("autoPetDefault", false);
         AUTO_HUG_DEFAULT = b.comment("未在终端单独设置的女仆是否允许自动拥抱；终端设置优先（默认关闭）")
                 .define("autoHugDefault", false);
+        ENABLE_OWNER_APPROACH_BOW = b.comment("女仆主人靠近时是否自动行礼（不影响终端手动播放行礼）")
+                .define("enableOwnerApproachBow", true);
         b.pop();
 
         b.push("winefox");
@@ -107,6 +110,10 @@ public class MoreAnimationConfig {
 
     public static boolean isAutoHugDefaultEnabled() {
         return AUTO_HUG_DEFAULT.get();
+    }
+
+    public static boolean isOwnerApproachBowEnabled() {
+        return ENABLE_OWNER_APPROACH_BOW.get();
     }
 
     public static List<String> getEnabledActions(String state) {

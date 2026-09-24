@@ -16,12 +16,11 @@ import java.util.Map;
 
 public class ExpressionScreen extends Screen {
     private static final int PANEL_W = 400;
-    private static final int PANEL_H = 228;
+    private static final int PANEL_H = 255;
     private static final int BLUE = 0xFF4EC9F5;
     private static final int GREEN = 0xFF55D68B;
     private static final int RED = 0xFFEB6A73;
-    private static final List<String> EXPRESSIONS = List.of(
-            "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang");
+    private static final List<String> EXPRESSIONS = MaidAnimationData.EXPRESSIONS;
 
     private final int maidId;
     private final Map<String, Integer> masks = new LinkedHashMap<>();
@@ -73,7 +72,7 @@ public class ExpressionScreen extends Screen {
             addAction(x + (i % 2) * 186, y + (i / 2) * 27, 178,
                     "gui.moreanimation.action." + action, () -> sendExpression(action));
         }
-        addAction(x, y + 112, 364, "gui.moreanimation.stop", () -> sendExpression("stop"));
+        addAction(x, y + 139, 364, "gui.moreanimation.stop", () -> sendExpression("stop"));
     }
 
     private void buildCategory(int x, int y, String category) {
@@ -161,8 +160,7 @@ public class ExpressionScreen extends Screen {
     private void sendExpression(String action) {
         if (Minecraft.getInstance().level != null
                 && Minecraft.getInstance().level.getEntity(maidId) instanceof EntityMaid maid) {
-            if ("stop".equals(action)) maid.getPersistentData().remove("moreanimation_expression");
-            else maid.getPersistentData().putString("moreanimation_expression", action);
+            MaidAnimationData.setExpressionLocal(maid, "stop".equals(action) ? "" : action);
         }
         MoreAnimationNetwork.CHANNEL.sendToServer(new ExpressionPacket(maidId, action));
     }

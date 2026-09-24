@@ -6,6 +6,7 @@
     "refmap": "mixins.moreanimation.refmap.json",
     "mixins": [
         "LivingEntityDeathMixin",
+        "BrokenLegSpeedMixin",
         "MaidFollowOwnerTaskMixin",
         "MaidFollowOwnerVehicleTaskMixin"
     ],
@@ -14,6 +15,7 @@
         "AnimationProcessorMixin",
         "GeckoMaidEntityMixin",
         "GeckoModelLoaderMixin",
-        "YsmRendererMixin"
+        "YsmRendererMixin",
+        "GeckoFaceAnchorMixin"
     ]
 }

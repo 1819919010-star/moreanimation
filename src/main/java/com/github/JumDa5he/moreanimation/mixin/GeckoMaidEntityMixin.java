@@ -17,7 +17,8 @@ public abstract class GeckoMaidEntityMixin {
                                                      boolean update, CallbackInfo ci) {
         var maid = ((GeckoMaidEntity<?>) (Object) this).getMaid();
         if (maid != null && maid.asEntity() instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid entity
-                && MaidAnimationData.isActive(entity, "maid_bow")) {
+                && (MaidAnimationData.isActive(entity, "maid_bow")
+                || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.isSlap(entity))) {
             ci.cancel();
         }
     }

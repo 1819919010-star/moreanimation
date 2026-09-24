@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.compat.animation;
 
 import com.github.JumDa5he.moreanimation.compat.network.AnimationSyncPacket;
+import com.github.JumDa5he.moreanimation.compat.network.ExpressionSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -20,6 +21,8 @@ import java.util.Set;
 
 /** Per-maid animation preferences and the lightweight special-action lock. */
 public final class MaidAnimationData {
+    public static final String TAIL_INTERACTION_ACTIVE = "moreanimation_tail_drag_active";
+    public static final String FACE_INTERACTION_ACTIVE = "moreanimation_face_interaction_active";
     private static final String ENABLED_PREFIX = "moreanimation_enabled_";
     private static final String ACTIVE = "moreanimation_active_action";
     private static final String ACTIVE_UNTIL = "moreanimation_active_until";
@@ -37,6 +40,11 @@ public final class MaidAnimationData {
     private static final String RANDOM_SLEEP_POSE = "moreanimation_random_sleep_pose";
     private static final String RANDOM_SLEEP_POSE_SET = "moreanimation_random_sleep_pose_set";
     private static final String FORM_MODE = "moreanimation_form_mode";
+    private static final String MANUAL_EXPRESSION = "moreanimation_expression";
+    private static final String RANDOM_EXPRESSION = "moreanimation_random_expression";
+    private static final String RANDOM_EXPRESSION_UNTIL = "moreanimation_random_expression_until";
+    private static final String RANDOM_EXPRESSION_NEXT_CHECK = "moreanimation_random_expression_next_check";
+    private static final String CLIENT_EXPRESSION = "moreanimation_expression_render";
     public static final String AUTO_INTERACTION_COOLDOWN = "moreanimation_auto_interaction_cooldown";
 
     public static final int FORM_AUTO = 0;
@@ -45,21 +53,32 @@ public final class MaidAnimationData {
 
     public static final int PRIORITY_RANDOM = 10;
     public static final int PRIORITY_MANUAL = 20;
+    public static final int PRIORITY_WATER_SHAKE = 30;
     public static final int PRIORITY_INJURED = 50;
     public static final int PRIORITY_INTERACTION = 40;
+    public static final int PRIORITY_KICK_BUTT = 60;
+    public static final int PRIORITY_KICK_LAUNCH = 70;
     public static final int PRIORITY_DEATH = 100;
+
+    public static final List<String> EXPRESSIONS = List.of(
+            "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang", "uhoh");
 
     public static final Map<String, List<String>> ACTIONS = new LinkedHashMap<>();
     private static final Set<String> PARALLEL_ACTIONS = Set.of(
             "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether",
             "lips", "ear_pull_left", "ear_pull_right", "hang", "game_lost2", "tailcircle", "dance1",
-            "circledance", "CLEANTAIL", "!??!");
+            "circledance", "CLEANTAIL", "!??!", "beg2", "fallen_broken_leg", "broken_leg_crawl",
+            "slapright", "slapleft");
     private static final Set<String> LOOPING_ACTIONS = Set.of(
             "come", "come2", "weidu", "ha", "morebeg", "sleep2", "eattail", "catchbyhook",
             "drowning", "situp", "pet_reaction_hold", "pet_other_head", "tailpull", "lips",
             "ear_pull_left", "ear_pull_right", "hang", "game_lost2", "tailcircle", "dance1",
             "circledance", "CLEANTAIL", "!??!", "sit2", "moresleep2", "moresleep3",
-            "moresleep4", "moresleep5", "moresleep6", "cold_hug_shiver", "ground_hurt");
+            "moresleep4", "moresleep5", "moresleep6", "cold_hug_shiver", "ground_hurt",
+            "kick_launch_front", "beg2", "fallen_broken_leg", "broken_leg_crawl");
+    private static final Set<String> SLEEP_BODY_ACTIONS = Set.of(
+            "sleep", "come", "sleep2", "situp", "moresleep2", "moresleep3",
+            "moresleep4", "moresleep5", "moresleep6");
     static {
         ACTIONS.put("stand", List.of("circledance", "!??!"));
         ACTIONS.put("sit", List.of("come2", "ha", "tastetail"));
@@ -197,6 +216,8 @@ public final class MaidAnimationData {
     public static boolean start(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
         long now = maid.level().getGameTime();
         CompoundTag data = maid.getPersistentData();
+        if (data.getBoolean(TAIL_INTERACTION_ACTIVE) && priority < PRIORITY_DEATH) return false;
+        if (maid.isSleeping() && !isAllowedWhileSleeping(action)) return false;
         if (isActive(maid) && data.getInt(ACTIVE_PRIORITY) > priority) return false;
         data.putString(ACTIVE, action);
         data.putLong(ACTIVE_START, now);
@@ -212,6 +233,7 @@ public final class MaidAnimationData {
     }
 
     public static void clientStart(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
+        if (maid.isSleeping() && !isAllowedWhileSleeping(action)) return;
         CompoundTag data = maid.getPersistentData();
         data.putString(ACTIVE, action);
         data.putLong(ACTIVE_START, maid.level().getGameTime());
@@ -267,7 +289,100 @@ public final class MaidAnimationData {
         return isActive(maid) ? maid.getPersistentData().getInt(ACTIVE_PRIORITY) : Integer.MIN_VALUE;
     }
 
+    public static boolean isTailInteractionActive(EntityMaid maid) {
+        return maid.getPersistentData().getBoolean(TAIL_INTERACTION_ACTIVE);
+    }
+
+    public static boolean isFaceInteractionActive(EntityMaid maid) {
+        return maid.getPersistentData().getBoolean(FACE_INTERACTION_ACTIVE);
+    }
+
+    /** Manual terminal expressions always take precedence over the timed random overlay. */
+    public static String effectiveExpression(EntityMaid maid) {
+        CompoundTag data = maid.getPersistentData();
+        if (maid.level().isClientSide()) return data.getString(CLIENT_EXPRESSION);
+        String manual = data.getString(MANUAL_EXPRESSION);
+        if (!manual.isEmpty()) return manual;
+        return maid.level().getGameTime() < data.getLong(RANDOM_EXPRESSION_UNTIL)
+                ? data.getString(RANDOM_EXPRESSION) : "";
+    }
+
+    public static void setManualExpression(EntityMaid maid, String expression) {
+        if (!expression.isEmpty() && !EXPRESSIONS.contains(expression)) return;
+        if (expression.isEmpty()) maid.getPersistentData().remove(MANUAL_EXPRESSION);
+        else maid.getPersistentData().putString(MANUAL_EXPRESSION, expression);
+        syncExpression(maid);
+    }
+
+    public static void setExpressionLocal(EntityMaid maid, String expression) {
+        if (expression.isEmpty()) maid.getPersistentData().remove(CLIENT_EXPRESSION);
+        else maid.getPersistentData().putString(CLIENT_EXPRESSION, expression);
+    }
+
+    public static void syncExpression(EntityMaid maid) {
+        if (maid.level() instanceof ServerLevel) {
+            MoreAnimationNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> maid),
+                    new ExpressionSyncPacket(maid.getId(), effectiveExpression(maid)));
+        }
+    }
+
+    private static void tickRandomExpression(EntityMaid maid) {
+        CompoundTag data = maid.getPersistentData();
+        long now = maid.level().getGameTime();
+        if (!maid.isAlive() || isTailInteractionActive(maid)) {
+            boolean wasVisible = data.getString(MANUAL_EXPRESSION).isEmpty()
+                    && !data.getString(RANDOM_EXPRESSION).isEmpty();
+            data.remove(RANDOM_EXPRESSION);
+            data.remove(RANDOM_EXPRESSION_UNTIL);
+            if (wasVisible) syncExpression(maid);
+            return;
+        }
+
+        if (activePriority(maid) >= PRIORITY_INJURED
+                && data.getString(MANUAL_EXPRESSION).isEmpty()
+                && !data.getString(RANDOM_EXPRESSION).isEmpty()) {
+            data.remove(RANDOM_EXPRESSION);
+            data.remove(RANDOM_EXPRESSION_UNTIL);
+            syncExpression(maid);
+        }
+
+        if (!data.getString(RANDOM_EXPRESSION).isEmpty()
+                && now >= data.getLong(RANDOM_EXPRESSION_UNTIL)) {
+            data.remove(RANDOM_EXPRESSION);
+            data.remove(RANDOM_EXPRESSION_UNTIL);
+            syncExpression(maid);
+        }
+
+        if (!data.contains(RANDOM_EXPRESSION_NEXT_CHECK, Tag.TAG_LONG)) {
+            data.putLong(RANDOM_EXPRESSION_NEXT_CHECK, now + 1 + maid.getRandom().nextInt(1200));
+            return;
+        }
+        if (now < data.getLong(RANDOM_EXPRESSION_NEXT_CHECK)) return;
+        data.putLong(RANDOM_EXPRESSION_NEXT_CHECK, now + 1200);
+        if (!data.getString(MANUAL_EXPRESSION).isEmpty()
+                || !data.getString(RANDOM_EXPRESSION).isEmpty()
+                || activePriority(maid) >= PRIORITY_INJURED) return;
+        if (maid.getRandom().nextFloat() >= 0.10F) return;
+
+        String expression = EXPRESSIONS.get(maid.getRandom().nextInt(EXPRESSIONS.size()));
+        data.putString(RANDOM_EXPRESSION, expression);
+        data.putLong(RANDOM_EXPRESSION_UNTIL, now + 200);
+        syncExpression(maid);
+    }
+
+    public static void clearTransientExpression(EntityMaid maid) {
+        CompoundTag data = maid.getPersistentData();
+        data.remove(RANDOM_EXPRESSION);
+        data.remove(RANDOM_EXPRESSION_UNTIL);
+        data.remove(RANDOM_EXPRESSION_NEXT_CHECK);
+    }
+
     public static void serverTick(EntityMaid maid) {
+        if (!maid.level().isClientSide()) tickRandomExpression(maid);
+        if (maid.isSleeping() && isActive(maid) && !isAllowedWhileSleeping(activeAction(maid))) {
+            stop(maid);
+            return;
+        }
         if (!isActive(maid)) {
             if (!maid.getPersistentData().getString(ACTIVE).isEmpty()) stop(maid);
             return;
@@ -279,6 +394,10 @@ public final class MaidAnimationData {
             return;
         }
         if (data.getBoolean(ACTIVE_LOCK_MOVEMENT)) freeze(maid);
+    }
+
+    public static boolean isAllowedWhileSleeping(String action) {
+        return SLEEP_BODY_ACTIONS.contains(action) || action.startsWith("death_");
     }
 
     public static void freeze(EntityMaid maid) {
@@ -314,6 +433,9 @@ public final class MaidAnimationData {
             case "situp" -> 400;
             case "ground_hurt" -> 20;
             case "cold_hug_shiver" -> 12;
+            case "water_shake" -> 34;
+            case "kick_butt" -> 20;
+            case "kick_launch_front" -> 400;
             default -> 100;
         };
     }

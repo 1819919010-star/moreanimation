@@ -12,4 +12,6 @@ public class ModItems {
             () -> new ExpressionItem(new Item.Properties().stacksTo(1)));
     public static final RegistryObject<Item> HAND = ITEMS.register("hand",
             () -> new HandItem(new Item.Properties().stacksTo(1)));
+    public static final RegistryObject<Item> JADE_FOOT = ITEMS.register("jade_foot",
+            () -> new JadeFootItem(new Item.Properties().stacksTo(1)));
 }

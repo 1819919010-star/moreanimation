@@ -4,6 +4,7 @@ import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.compat.animation.GameLostAnimation;
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
 import com.github.JumDa5he.moreanimation.compat.network.MaidVisualSettingsPacket;
+import com.github.JumDa5he.moreanimation.compat.network.ExpressionSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.core.HandItem;
 import com.github.tartaricacid.touhoulittlemaid.config.subconfig.MaidConfig;
@@ -20,6 +21,7 @@ import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
@@ -33,6 +35,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -61,12 +64,13 @@ public class MaidInteractionEvent {
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level)) return;
-        for (Entity entity : level.getAllEntities()) {
-            if (!(entity instanceof EntityMaid maid)) continue;
+        for (EntityMaid maid : loadedMaids(level)) {
             if (maid.getPersistentData().getBoolean(CONTROL_ACTIVE) && !isMovementControlled(maid)) {
                 endControl(maid);
             }
             restoreBowPose(maid);
+            BegAnimationEvent.serverTick(maid);
+            BrokenLegEvent.serverTick(maid);
             MaidAnimationData.serverTick(maid);
             GameLostAnimation.serverTick(maid);
             if (maid.isAlive() && level.getGameTime() % 5 == 0 && !isMovementControlled(maid)) {
@@ -77,6 +81,12 @@ public class MaidInteractionEvent {
             }
         }
         tickSessions(level);
+    }
+
+    /** Returns a detached, maid-only snapshot instead of the level's live all-entity iterable. */
+    private static List<? extends EntityMaid> loadedMaids(ServerLevel level) {
+        return level.getEntities(EntityTypeTest.forClass(EntityMaid.class),
+                maid -> maid.level() == level && !maid.isRemoved());
     }
 
     private static void tickBowAndRefuse(EntityMaid maid) {
@@ -90,7 +100,8 @@ public class MaidInteractionEvent {
             maid.getPersistentData().putBoolean(BOW_INSIDE, false);
         } else {
             maid.getPersistentData().putBoolean(BOW_INSIDE, true);
-            if (!wasInside && maid.getPersistentData().getBoolean(BOW_ARMED)
+            if (MoreAnimationConfig.isOwnerApproachBowEnabled()
+                    && !wasInside && maid.getPersistentData().getBoolean(BOW_ARMED)
                     && now >= maid.getPersistentData().getLong(BOW_COOLDOWN)) {
                 boolean wasSitting = maid.isMaidInSittingPose();
                 if (wasSitting) maid.setInSittingPose(false);
@@ -214,6 +225,8 @@ public class MaidInteractionEvent {
                     new MaidVisualSettingsPacket(maid.getId(),
                             MoreAnimationConfig.isWinefoxLowHealthFoxEnabled(),
                             MaidAnimationData.formMode(maid)));
+            MoreAnimationNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    new ExpressionSyncPacket(maid.getId(), MaidAnimationData.effectiveExpression(maid)));
         }
     }
 
@@ -228,6 +241,7 @@ public class MaidInteractionEvent {
             }
         }
         SESSIONS.clear();
+        GameLostAnimation.clearAll();
     }
 
     private static String classifyDeath(DamageSource source) {

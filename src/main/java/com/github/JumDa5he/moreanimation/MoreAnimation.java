@@ -5,6 +5,7 @@ import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.util.CustomPackInstaller;
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
 import com.github.JumDa5he.moreanimation.core.ModItems;
+import com.github.JumDa5he.moreanimation.core.ModCreativeTabs;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
@@ -26,6 +27,8 @@ public class MoreAnimation {
 
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModItems.ITEMS.register(modBus);
+        com.github.JumDa5he.moreanimation.core.ModSounds.SOUNDS.register(modBus);
+        ModCreativeTabs.TABS.register(modBus);
         modBus.addListener(this::addCreativeTabItems);
     }
 
@@ -33,6 +36,7 @@ public class MoreAnimation {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModItems.EXPRESSION_ITEM);
             event.accept(ModItems.HAND);
+            event.accept(ModItems.JADE_FOOT);
         }
     }
 }

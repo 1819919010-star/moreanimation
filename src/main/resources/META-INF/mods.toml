@@ -4,7 +4,7 @@ license = "All rights reserved"
 
 [[mods]]
 modId = "moreanimation"
-version = "1.1.0"
+version = "1.2.0"
 displayName = "More Animation"
 authors = "JumDa5he"
 description = "给酒狐添加更多动作"

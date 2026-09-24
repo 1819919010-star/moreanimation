@@ -1,0 +1,11 @@
+{
+  "slap": {
+    "subtitle": "subtitles.moreanimation.slap",
+    "sounds": [
+      {
+        "name": "moreanimation:slap",
+        "stream": false
+      }
+    ]
+  }
+}

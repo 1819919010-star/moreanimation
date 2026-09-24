@@ -8,8 +8,11 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
@@ -101,11 +104,9 @@ public class HugAnimationEvent {
     }
 
     private static void scanNewPairs(ServerLevel level, long now) {
-        // 遍历全部已加载实体，不依赖大范围 AABB 查询
-        for (Entity entity : level.getAllEntities()) {
-            if (!(entity instanceof EntityMaid a)) {
-                continue;
-            }
+        // 使用 maid-only 快照，避免直接迭代 ServerLevel 的 live all-entity collection。
+        for (EntityMaid a : level.getEntities(EntityTypeTest.forClass(EntityMaid.class),
+                maid -> maid.level() == level && !maid.isRemoved())) {
             if (!a.isAlive() || HUG_START_TIMES.containsKey(a.getUUID()) || isCooldown(a, now)) {
                 continue;
             }
@@ -120,6 +121,35 @@ public class HugAnimationEvent {
                 startHug(level, a, b, now);
                 break;
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onEntityLeave(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide() || !(event.getEntity() instanceof EntityMaid maid)) return;
+        clearSession(maid.getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        HUG_START_TIMES.clear();
+        HUG_PARTNERS.clear();
+        HUG_LEVELS.clear();
+        HUG_SENT_STATE.clear();
+        COOLDOWN_UNTIL.clear();
+    }
+
+    private static void clearSession(UUID maidUuid) {
+        UUID partnerUuid = HUG_PARTNERS.remove(maidUuid);
+        HUG_START_TIMES.remove(maidUuid);
+        HUG_LEVELS.remove(maidUuid);
+        HUG_SENT_STATE.remove(maidUuid);
+        COOLDOWN_UNTIL.remove(maidUuid);
+        if (partnerUuid != null) {
+            HUG_PARTNERS.remove(partnerUuid);
+            HUG_START_TIMES.remove(partnerUuid);
+            HUG_LEVELS.remove(partnerUuid);
+            HUG_SENT_STATE.remove(partnerUuid);
         }
     }
 

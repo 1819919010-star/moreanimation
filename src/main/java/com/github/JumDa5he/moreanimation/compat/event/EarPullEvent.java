@@ -6,10 +6,14 @@ import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
@@ -37,6 +41,7 @@ public class EarPullEvent {
     private static final Map<UUID, Long> PENDING_ANIMS = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> COOLDOWN_UNTIL = new ConcurrentHashMap<>();
     private static final Map<UUID, HoldState> HOLDING = new ConcurrentHashMap<>();
+    private static final Map<UUID, ResourceKey<Level>> ACTIVE_DIMENSIONS = new ConcurrentHashMap<>();
 
     private static class HoldState {
         final UUID holder;
@@ -83,6 +88,7 @@ public class EarPullEvent {
         PENDING_ANIMS.put(maid.getUUID(), now + EAR_PULL_ANIM_TICKS);
         COOLDOWN_UNTIL.put(maid.getUUID(), now + COOLDOWN_TICKS);
         HOLDING.put(maid.getUUID(), new HoldState(player.getUUID(), now));
+        ACTIVE_DIMENSIONS.put(maid.getUUID(), level.dimension());
         int side = level.random.nextBoolean() ? 1 : 0;
         String action = side == 1 ? "ear_pull_right" : "ear_pull_left";
         MaidAnimationData.start(maid, action, ACTIVE_HOLD_TICKS,
@@ -99,6 +105,7 @@ public class EarPullEvent {
         // 长按松开：立即停止动画恢复；点按：动画播完自然恢复
         if (now - state.holdStart >= LONG_PRESS_TICKS) {
             PENDING_ANIMS.remove(maid.getUUID());
+            ACTIVE_DIMENSIONS.remove(maid.getUUID());
             stopEarAction(maid);
             sendEarPullState(level, maid, false, 0);
         }
@@ -116,12 +123,14 @@ public class EarPullEvent {
         while (it.hasNext()) {
             Map.Entry<UUID, Long> entry = it.next();
             UUID maidUuid = entry.getKey();
+            if (!level.dimension().equals(ACTIVE_DIMENSIONS.get(maidUuid))) continue;
             if (now >= entry.getValue() && !HOLDING.containsKey(maidUuid)) {
                 it.remove();
                 if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
                     stopEarAction(maid);
                     sendEarPullState(level, maid, false, 0);
                 }
+                ACTIVE_DIMENSIONS.remove(maidUuid);
             }
         }
 
@@ -130,15 +139,20 @@ public class EarPullEvent {
             Map.Entry<UUID, HoldState> entry = hi.next();
             UUID maidUuid = entry.getKey();
             HoldState state = entry.getValue();
+            if (!level.dimension().equals(ACTIVE_DIMENSIONS.get(maidUuid))) continue;
             if (!(level.getEntity(maidUuid) instanceof EntityMaid maid)) {
                 hi.remove();
+                PENDING_ANIMS.remove(maidUuid);
+                ACTIVE_DIMENSIONS.remove(maidUuid);
                 continue;
             }
             Player holder = level.getPlayerByUUID(state.holder);
             if (holder == null || !holder.isAlive()) {
                 hi.remove();
+                PENDING_ANIMS.remove(maidUuid);
                 stopEarAction(maid);
                 sendEarPullState(level, maid, false, 0);
+                ACTIVE_DIMENSIONS.remove(maidUuid);
                 continue;
             }
             double dx = maid.getX() - holder.getX();
@@ -149,6 +163,7 @@ public class EarPullEvent {
                 PENDING_ANIMS.remove(maidUuid);
                 stopEarAction(maid);
                 sendEarPullState(level, maid, false, 0);
+                ACTIVE_DIMENSIONS.remove(maidUuid);
                 continue;
             }
             // 目标点：玩家面朝方向身前方 0.8 格（玩家不动则停在其身前，玩家移动则跟随）
@@ -191,6 +206,24 @@ public class EarPullEvent {
             maid.setYBodyRot(yaw);
             maid.setYHeadRot(yaw);
         }
+    }
+
+    @SubscribeEvent
+    public static void onEntityLeave(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide() || !(event.getEntity() instanceof EntityMaid maid)) return;
+        UUID id = maid.getUUID();
+        PENDING_ANIMS.remove(id);
+        COOLDOWN_UNTIL.remove(id);
+        HOLDING.remove(id);
+        ACTIVE_DIMENSIONS.remove(id);
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        PENDING_ANIMS.clear();
+        COOLDOWN_UNTIL.clear();
+        HOLDING.clear();
+        ACTIVE_DIMENSIONS.clear();
     }
 
     private static double clamp(double value, double min, double max) {

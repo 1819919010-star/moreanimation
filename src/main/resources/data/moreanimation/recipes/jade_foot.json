@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {"item": "minecraft:leather"},
+    {"item": "minecraft:leather"},
+    {"item": "minecraft:leather"}
+  ],
+  "result": {
+    "item": "moreanimation:jade_foot",
+    "count": 1
+  }
+}

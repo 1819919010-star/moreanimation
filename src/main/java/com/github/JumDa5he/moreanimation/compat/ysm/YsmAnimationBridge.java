@@ -2,6 +2,8 @@ package com.github.JumDa5he.moreanimation.compat.ysm;
 
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.client.TailInteractionState;
+import com.github.JumDa5he.moreanimation.client.FaceInteractionState;
+import com.github.JumDa5he.moreanimation.client.FaceInteractionMath;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
@@ -19,43 +21,38 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- * Version-pinned runtime bridge. Official YSM's MixinTweaker loads the old
- * YsmAnimatableMixin target during config selection, so the active hook lives
- * in the later-loaded YSM renderer instead.
- * No YSM classes occur in JVM descriptors or imports.
- */
+   
+                                                                           
+                                                                              
+                                            
+                                                      
+   
 @EventBusSubscriber(modid = "moreanimation", value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";
-    /** Every common animation that current Java code can actually select. */
+                                                                             
     private static final Set<String> SUPPORTED_ACTIONS = Set.of(
             "circledance", "!??!", "come", "come2", "weidu", "ha", "tastetail", "eattail", "sleep2", "situp",
             "sit2", "moresleep4", "moresleep6", "cold_hug_shiver", "ground_hurt",
             "maid_bow", "refuse", "injured_kneel", "death_fall", "death_drown", "death_burn",
             "death_ranged", "fear_retreat_fall", "pet_reaction", "pet_reaction_hold", "pet_other_head",
-            "pet_other_head_raise", "hugtogether", "morebeg", "catchbyhook", "hurt", "kowtow",
+            "pet_other_head_raise", "hugtogether", "morebeg", "water_shake",
+            "kick_butt", "kick_launch_front", "catchbyhook", "hurt", "kowtow",
             "drowning", "pray", "watchtombstone", "CLEANTAIL", "game_lost2", "tailcircle", "tailpull",
-            "ear_pull_left", "ear_pull_right", "hang", "dance1", "lips");
-    /** Persistent terminal expressions played independently from the main action. */
+            "ear_pull_left", "ear_pull_right", "hang", "dance1", "lips",
+            "beg2", "fallen_broken_leg", "broken_leg_crawl", "slapright", "slapleft");
+                                                                                     
     private static final Set<String> SUPPORTED_EXPRESSIONS = Set.of(
-            "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang");
-    /** YSM already lowers its model for a sitting maid; keep that computed root height for seated clips. */
+            "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang", "uhoh");
+                                                                                                            
     private static final Set<String> SEATED_ACTIONS = Set.of(
             "come2", "weidu", "ha", "tastetail", "eattail", "sit2");
-    /** Per-clip YSM bed-axis correction; values are applied in YSM's final bone coordinate system. */
+                                                                                                      
     private static final Map<String, Float> SLEEP_YAW_CORRECTIONS = Map.of(
             "moresleep4", (float) Math.toRadians(-90.0));
     private static final Set<String> ROOT_POSITION_BONES = Set.of(
             "root", "mroot", "mallbody", "allbody");
-    /** Body gesture channels embedded in expression clips are excluded from the YSM overlay. */
-    private static final Set<String> EXPRESSION_BONES = Set.of(
-            "Head", "AllHead", "EyeBrow", "RightEyebrow", "LeftEyebrow",
-            "RightEyelid", "LeftEyelid", "RightEyelidBase", "LeftEyelidBase",
-            "RightEyePublic", "LeftEyePublic", "ysmGlowRightEyelidBase2", "ysmGlowLeftEyelidBase2",
-            "ysmGlowRightEyePublic2", "ysmGlowLeftEyePublic2", "Mouth_surprise", "Mouth_chill",
-            "Mouth_smile", "Mouth_smile2", "jingya", "xiao", "weixiao", "Ear", "Left_ear", "Right_ear");
     private static final Set<String> CLIP_NAMES;
     static {
         Set<String> names = new HashSet<>(SUPPORTED_ACTIONS);
@@ -74,6 +71,7 @@ public final class YsmAnimationBridge {
     private static boolean initialized, disabled;
     private static Object resourceManager;
     private static Map<String, YsmAnimationClip> clips = Map.of();
+    private static final Set<String> invalidSampleClips = new HashSet<>();
     private record Saved(Object bone, int component, float value) {}
     private record Playing(String action, long start) {}
     private record ExpressionPlaying(String expression, long start) {}
@@ -84,6 +82,7 @@ public final class YsmAnimationBridge {
     public static void registerReload(RegisterClientReloadListenersEvent event) {
         event.registerReloadListener((ResourceManagerReloadListener) manager -> {
             clips = Map.of();
+            invalidSampleClips.clear();
             resourceManager = null;
             PLAYING.clear();
             PLAYING_EXPRESSIONS.clear();
@@ -121,12 +120,12 @@ public final class YsmAnimationBridge {
         }
     }
 
-    /** Restore before YSM evaluates or reuses its cached pose, including after stop/switch. */
+                                                                                               
     public static void before(Object animatable) {
         List<Saved> saved = SAVED.remove(animatable);
         if (saved == null) return;
         try {
-            // Unwind in reverse because an expression can replace a facial component set by a main action.
+                                                                                                      
             for (int i = saved.size() - 1; i >= 0; i--) {
                 Saved s = saved.get(i);
                 SET[s.component].invoke(s.bone, s.value);
@@ -139,7 +138,7 @@ public final class YsmAnimationBridge {
         try {
             if (!(entity.invoke(animatable) instanceof EntityMaid maid)) return;
             String action = MaidAnimationData.activeAction(maid);
-            String expression = maid.getPersistentData().getString("moreanimation_expression");
+            String expression = MaidAnimationData.effectiveExpression(maid);
             Playing previous = PLAYING.get(animatable);
             if (action.isEmpty()) {
                 if (previous != null) {
@@ -183,21 +182,29 @@ public final class YsmAnimationBridge {
             }
             TailInteractionState.PoseSnapshot tailPose = TailInteractionState.poseFor(maid.getId());
             boolean applyTail = tailPose != null;
-            if (!applyAction && !applyExpression && !applyTail && !tailExclusive) return;
+            FaceInteractionState.PoseSnapshot facePose = FaceInteractionState.poseFor(maid.getId());
+            boolean applyFace = facePose != null;
+            if (!applyAction && !applyExpression && !applyTail && !tailExclusive && !applyFace) return;
             var resources = Minecraft.getInstance().getResourceManager();
-            if ((applyAction || applyExpression) && (clips.isEmpty() || resourceManager != resources)) {
+            if ((applyAction || applyExpression) && resourceManager != resources) {
                 try (var reader = new InputStreamReader(resources.open(ResourceLocation.fromNamespaceAndPath(
                         "moreanimation", "animation/unknown.animation.json")), StandardCharsets.UTF_8)) {
-                    clips = YsmAnimationClip.read(reader, CLIP_NAMES);
-                    resourceManager = resources;
+                    clips = YsmAnimationClip.read(reader, CLIP_NAMES, (failedAction, error) ->
+                            LOG.error("YSM clip {} unavailable; other clips remain enabled", failedAction, error));
                     clips.forEach((name, loaded) -> {
                         if (!loaded.omittedFeatures.isEmpty()) {
                             LOG.warn("YSM action {} omits non-bone animation features {}",
                                     name, loaded.omittedFeatures);
                         }
                     });
+                } catch (java.io.IOException | RuntimeException error) {
+                    clips = Map.of();
+                    LOG.error("YSM animation resource unavailable; procedural poses remain enabled", error);
                 }
+                resourceManager = resources;
             }
+            applyAction &= clips.containsKey(action);
+            applyExpression &= clips.containsKey(expression);
             long actionStart = MaidAnimationData.activeStart(maid);
             boolean actionChanged = applyAction && (previous == null || !previous.action().equals(action)
                     || previous.start() != actionStart);
@@ -214,13 +221,13 @@ public final class YsmAnimationBridge {
                 byName.put(boneName, bone);
                 byNormalizedName.putIfAbsent(boneName.toLowerCase(Locale.ROOT), bone);
             }
-            // Verified default YSM model uses MAllBody for the whole-body child of Root.
+                                                                                         
             if (!byName.containsKey("MRoot") && byName.containsKey("MAllBody"))
                 byName.put("MRoot", byName.get("MAllBody"));
             List<Saved> saved = new ArrayList<>();
             Set<String> missingBones = actionChanged ? new LinkedHashSet<>() : null;
             Set<String> missingExpressionBones = expressionChanged ? new LinkedHashSet<>() : null;
-            SAVED.put(animatable, saved); // Also permits rollback if an invocation fails midway.
+            SAVED.put(animatable, saved);                                                        
             if (tailExclusive) {
                 applyTailExclusiveBase(TailInteractionState.usesSittingBase(maid.getId()), byName, saved);
             }
@@ -230,15 +237,18 @@ public final class YsmAnimationBridge {
                 double seconds = MaidAnimationData.isLoopingAction(action)
                         ? Math.max(0, elapsedSeconds) % clip.length
                         : Math.min(clip.length, Math.max(0, elapsedSeconds));
-                applyClip(action, clip, seconds, byName, byNormalizedName, saved, missingBones, false);
+                applyClip(action, clip, seconds, byName, byNormalizedName, saved, missingBones, false,
+                        maid.getHealth(), maid.getMaxHealth());
             }
             if (applyExpression) {
                 YsmAnimationClip clip = clips.get(expression);
                 double elapsedSeconds = (now - previousExpression.start() + partialTick) / 20.0;
                 applyClip(expression, clip, Math.max(0, elapsedSeconds) % clip.length,
-                        byName, byNormalizedName, saved, missingExpressionBones, true);
+                        byName, byNormalizedName, saved, missingExpressionBones, true,
+                        maid.getHealth(), maid.getMaxHealth());
             }
             if (applyTail) applyProceduralTail(tailPose, byName, saved);
+            if (applyFace) applyProceduralFace(facePose, byName, saved);
             if (actionChanged) {
                 LOG.debug("YSM animation action {} applied {} bone components to maid {}",
                         action, saved.size(), maid.getUUID());
@@ -248,7 +258,7 @@ public final class YsmAnimationBridge {
                 }
             }
             if (expressionChanged && applyExpression) {
-                LOG.debug("YSM expression {} applied with {} missing facial bones to maid {}",
+                LOG.debug("YSM expression {} applied with {} missing bones to maid {}",
                         expression, missingExpressionBones.size(), maid.getUUID());
             }
         } catch (Exception | LinkageError e) {
@@ -257,6 +267,100 @@ public final class YsmAnimationBridge {
         }
     }
 
+    private static void applyProceduralFace(FaceInteractionState.PoseSnapshot pose,
+                                            Map<String, Object> byName,
+                                            List<Saved> saved) throws ReflectiveOperationException {
+        Object head = findBone(byName, "Head");
+        if (head == null) head = findBone(byName, "MHead", "AllHead");
+                                                                              
+                                                                              
+        if (head == null) head = findBone(byName, "Head2");
+        if (head != null) applyProceduralHeadBone(head, pose, saved);
+        if(pose.clickOnly())return;
+
+        Set<Object> visitedEars = Collections.newSetFromMap(new IdentityHashMap<>());
+        boolean leftSegmented = byName.keySet().stream().anyMatch(name ->
+                FaceInteractionState.earSide(name) < 0 && FaceInteractionState.earSegment(name) > 0.0f);
+        boolean rightSegmented = byName.keySet().stream().anyMatch(name ->
+                FaceInteractionState.earSide(name) > 0 && FaceInteractionState.earSegment(name) > 0.0f);
+        for (Map.Entry<String, Object> entry : byName.entrySet()) {
+            int side = FaceInteractionState.earSide(entry.getKey());
+            Object bone = entry.getValue();
+            if (side == 0 || !visitedEars.add(bone)) continue;
+            FaceInteractionState.EarPoseSnapshot ear = side < 0 ? pose.left() : pose.right();
+            float segment = FaceInteractionState.earSegment(entry.getKey());
+            boolean segmented = side < 0 ? leftSegmented : rightSegmented;
+            applyProceduralEarBone(bone, ear,
+                    FaceInteractionState.earRotationWeight(segment, segmented),
+                    FaceInteractionState.earPositionWeight(segment, segmented),
+                    FaceInteractionState.earStretchWeight(segment, segmented), side < 0, segment <= 0, saved);
+        }
+    }
+
+    private static void applyProceduralHeadBone(Object bone, FaceInteractionState.PoseSnapshot pose,
+                                                List<Saved> saved) throws ReflectiveOperationException {
+        Vector3f initial = (Vector3f) bind.invoke(bone);
+        Vector3f rotation = FaceInteractionMath.compose(initial.x(), initial.y(), initial.z(),
+                pose.headPitch(), pose.headYaw(), 0);
+        saveAndSet(bone, 0, rotation.x(), saved);
+        saveAndSet(bone, 1, rotation.y(), saved);
+        saveAndSet(bone, 2, rotation.z(), saved);
+        addComponent(bone, 3, -pose.headOffsetX(), saved);
+        addComponent(bone, 4, pose.headOffsetY(), saved);
+    }
+
+    private static void applyProceduralEarBone(Object bone, FaceInteractionState.EarPoseSnapshot pose,
+                                               float rotationWeight, float positionWeight,
+                                               float stretchWeight, boolean left, boolean root, List<Saved> saved)
+            throws ReflectiveOperationException {
+        Vector3f initial = (Vector3f) bind.invoke(bone);
+                                                                                
+                                                                                            
+        Vector3f rotation = FaceInteractionMath.compose(initial.x(), initial.y(), initial.z(),
+                pose.pitch() * rotationWeight, pose.yaw() * rotationWeight, pose.roll() * rotationWeight);
+        saveAndSet(bone, 0, rotation.x(), saved);
+        saveAndSet(bone, 1, rotation.y(), saved);
+        saveAndSet(bone, 2, rotation.z(), saved);
+        addComponent(bone, 3, -pose.offsetX() * positionWeight, saved);
+        addComponent(bone, 4, pose.offsetY() * positionWeight, saved);
+        addComponent(bone, 5, FaceInteractionState.earDepthOffset(pose) * positionWeight, saved);
+        int component = 6 + FaceInteractionMath.longitudinalAxis(initial.x(), initial.y(), initial.z());
+        float scale = ((Number) GET[component].invoke(bone)).floatValue();
+        if (root) {
+            Vector3f compensation = FaceInteractionMath.earRootCompensation(left,
+                    initial.x(), initial.y(), initial.z(), pose.pitch() * rotationWeight,
+                    pose.yaw() * rotationWeight, pose.roll() * rotationWeight,
+                    1.0f + pose.stretch() * stretchWeight);
+            addComponent(bone, 3, -compensation.x, saved);
+            addComponent(bone, 4, compensation.y, saved);
+            addComponent(bone, 5, compensation.z, saved);
+        }
+        saveAndSet(bone, component, scale * (1.0f + pose.stretch() * stretchWeight), saved);
+    }
+
+    private static void addComponent(Object bone, int component, float offset, List<Saved> saved)
+            throws ReflectiveOperationException {
+        float current = ((Number) GET[component].invoke(bone)).floatValue();
+        saveAndSet(bone, component, current + offset, saved);
+    }
+
+    private static void saveAndSet(Object bone, int component, float value, List<Saved> saved)
+            throws ReflectiveOperationException {
+        float current = ((Number) GET[component].invoke(bone)).floatValue();
+        saved.add(new Saved(bone, component, current));
+        SET[component].invoke(bone, value);
+    }
+
+    private static Object findBone(Map<String, Object> byName, String... candidates) {
+        for (String candidate : candidates) {
+            Object exact = byName.get(candidate);
+            if (exact != null) return exact;
+            for (Map.Entry<String, Object> entry : byName.entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(candidate)) return entry.getValue();
+            }
+        }
+        return null;
+    }
     private static void applyProceduralTail(TailInteractionState.PoseSnapshot pose,
                                             Map<String, Object> byName,
                                             List<Saved> saved) throws ReflectiveOperationException {
@@ -298,32 +402,44 @@ public final class YsmAnimationBridge {
     private static void applyClip(String animation, YsmAnimationClip clip, double seconds,
                                   Map<String, Object> byName,
                                   Map<String, Object> byNormalizedName, List<Saved> saved,
-                                  Set<String> missingBones, boolean expressionOnly) throws ReflectiveOperationException {
+                                  Set<String> missingBones, boolean expressionOverlay,
+                                  float health, float maxHealth) throws ReflectiveOperationException {
+        if (invalidSampleClips.contains(animation)) return;
+        List<float[]> samples = new ArrayList<>(clip.channels.size());
+        try {
+            for (var channel : clip.channels) samples.add(channel.sample(seconds, health, maxHealth));
+        } catch (RuntimeException error) {
+            invalidSampleClips.add(animation);
+            LOG.error("YSM clip {} evaluation failed; other clips remain enabled", animation, error);
+            return;
+        }
+        int channelIndex = 0;
         for (var channel : clip.channels) {
-            if (expressionOnly && !EXPRESSION_BONES.contains(channel.bone())) continue;
+            float[] values = samples.get(channelIndex++);
             Object bone = byName.get(channel.bone());
             if (bone == null) bone = byNormalizedName.get(channel.bone().toLowerCase(Locale.ROOT));
             if (bone == null) {
                 if (missingBones != null) missingBones.add(channel.bone());
                 continue;
             }
-            float[] values = channel.sample(seconds);
             Vector3f initial = channel.offset() == 0 ? (Vector3f) bind.invoke(bone) : null;
-            boolean preserveSeatHeight = !expressionOnly && channel.offset() == 3
+            boolean preserveSeatHeight = !expressionOverlay && channel.offset() == 3
                     && SEATED_ACTIONS.contains(animation)
                     && ROOT_POSITION_BONES.contains(channel.bone().toLowerCase(Locale.ROOT));
-            Float sleepYawCorrection = !expressionOnly && channel.offset() == 0
+            Float sleepYawCorrection = !expressionOverlay && channel.offset() == 0
                     && ROOT_POSITION_BONES.contains(channel.bone().toLowerCase(Locale.ROOT))
                     ? SLEEP_YAW_CORRECTIONS.get(animation) : null;
             for (int axis = 0; axis < 3; axis++) {
-                // Gecko seated clips contain their own downward root translation. YSM's pose calculation has
-                // already lowered a sitting maid, so applying the Y component again embeds the model in terrain.
+                                                                                                             
+                                                                                                                 
                 if (preserveSeatHeight && axis == 1) continue;
                 int component = channel.offset() + axis;
-                saved.add(new Saved(bone, component, ((Number) GET[component].invoke(bone)).floatValue()));
+                float current = ((Number) GET[component].invoke(bone)).floatValue();
+                saved.add(new Saved(bone, component, current));
                 float value = values[axis];
                 if (initial != null) {
-                    value = initial.get(axis) + (float) Math.toRadians(value) * (axis == 2 ? 1 : -1);
+                    float rotationOffset = (float) Math.toRadians(value) * (axis == 2 ? 1 : -1);
+                    value = initial.get(axis) + rotationOffset;
                     if (sleepYawCorrection != null && axis == 1) value += sleepYawCorrection;
                 }
                 SET[component].invoke(bone, value);

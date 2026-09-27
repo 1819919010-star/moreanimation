@@ -16,12 +16,21 @@ public class MoreAnimationNetwork {
             registrar.playToClient(CleanTailSyncPacket.TYPE, CleanTailSyncPacket.STREAM_CODEC, CleanTailSyncPacket::handle);
             registrar.playToClient(EarPullSyncPacket.TYPE, EarPullSyncPacket.STREAM_CODEC, EarPullSyncPacket::handle);
             registrar.playToClient(AnimationSyncPacket.TYPE, AnimationSyncPacket.STREAM_CODEC, AnimationSyncPacket::handle);
+            registrar.playToClient(ExpressionSyncPacket.TYPE, ExpressionSyncPacket.STREAM_CODEC, ExpressionSyncPacket::handle);
             registrar.playToClient(TerminalDataPacket.TYPE, TerminalDataPacket.STREAM_CODEC, TerminalDataPacket::handle);
             registrar.playToClient(MaidVisualSettingsPacket.TYPE, MaidVisualSettingsPacket.STREAM_CODEC, MaidVisualSettingsPacket::handle);
             registrar.playToClient(TailInteractionSessionPacket.TYPE, TailInteractionSessionPacket.STREAM_CODEC,
                     TailInteractionSessionPacket::handle);
             registrar.playToClient(TailPoseSyncPacket.TYPE, TailPoseSyncPacket.STREAM_CODEC,
                     TailPoseSyncPacket::handle);
+            registrar.playToClient(FaceInteractionSessionPacket.TYPE, FaceInteractionSessionPacket.STREAM_CODEC,
+                    FaceInteractionSessionPacket::handle);
+            registrar.playToClient(FacePoseSyncPacket.TYPE, FacePoseSyncPacket.STREAM_CODEC,
+                    FacePoseSyncPacket::handle);
+            registrar.playToClient(FaceClickSyncPacket.TYPE, FaceClickSyncPacket.STREAM_CODEC,
+                    FaceClickSyncPacket::handle);
+            registrar.playToClient(SlapFeedbackPacket.TYPE, SlapFeedbackPacket.STREAM_CODEC,
+                    SlapFeedbackPacket::handle);
         } else {
             registrar.playToClient(HuggingSyncPacket.TYPE, HuggingSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
             });
@@ -37,6 +46,8 @@ public class MoreAnimationNetwork {
             });
             registrar.playToClient(AnimationSyncPacket.TYPE, AnimationSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
             });
+            registrar.playToClient(ExpressionSyncPacket.TYPE, ExpressionSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
+            });
             registrar.playToClient(TerminalDataPacket.TYPE, TerminalDataPacket.STREAM_CODEC, (pkt, ctx) -> {
             });
             registrar.playToClient(MaidVisualSettingsPacket.TYPE, MaidVisualSettingsPacket.STREAM_CODEC, (pkt, ctx) -> {
@@ -44,6 +55,14 @@ public class MoreAnimationNetwork {
             registrar.playToClient(TailInteractionSessionPacket.TYPE, TailInteractionSessionPacket.STREAM_CODEC,
                     (pkt, ctx) -> { });
             registrar.playToClient(TailPoseSyncPacket.TYPE, TailPoseSyncPacket.STREAM_CODEC,
+                    (pkt, ctx) -> { });
+            registrar.playToClient(FaceInteractionSessionPacket.TYPE, FaceInteractionSessionPacket.STREAM_CODEC,
+                    (pkt, ctx) -> { });
+            registrar.playToClient(FacePoseSyncPacket.TYPE, FacePoseSyncPacket.STREAM_CODEC,
+                    (pkt, ctx) -> { });
+            registrar.playToClient(FaceClickSyncPacket.TYPE, FaceClickSyncPacket.STREAM_CODEC,
+                    (pkt, ctx) -> { });
+            registrar.playToClient(SlapFeedbackPacket.TYPE, SlapFeedbackPacket.STREAM_CODEC,
                     (pkt, ctx) -> { });
         }
 
@@ -55,5 +74,13 @@ public class MoreAnimationNetwork {
                 TailInteractionRequestPacket::handle);
         registrar.playToServer(TailPoseUpdatePacket.TYPE, TailPoseUpdatePacket.STREAM_CODEC,
                 TailPoseUpdatePacket::handle);
+        registrar.playToServer(FaceInteractionRequestPacket.TYPE, FaceInteractionRequestPacket.STREAM_CODEC,
+                FaceInteractionRequestPacket::handle);
+        registrar.playToServer(FacePoseUpdatePacket.TYPE, FacePoseUpdatePacket.STREAM_CODEC,
+                FacePoseUpdatePacket::handle);
+        registrar.playToServer(FaceClickPacket.TYPE, FaceClickPacket.STREAM_CODEC,
+                FaceClickPacket::handle);
+        registrar.playToServer(FaceStrokePacket.TYPE, FaceStrokePacket.STREAM_CODEC,
+                FaceStrokePacket::handle);
     }
 }

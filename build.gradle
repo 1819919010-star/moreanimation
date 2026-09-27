@@ -55,7 +55,7 @@ neoForge {
 }
 
 dependencies {
-    // Touhou Little Maid 1.21.1 NeoForge
+                                         
     implementation "maven.modrinth:touhou-little-maid:${tlm_version}"
 }
 
@@ -110,7 +110,7 @@ tasks.withType(ProcessResources).configureEach {
 }
 
 tasks.compileJava {
-    // Force recompilation to ensure clean class files
+                                                      
     outputs.upToDateWhen { false }
 }
 

@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -100,11 +101,9 @@ public class HugAnimationEvent {
     }
 
     private static void scanNewPairs(ServerLevel level, long now) {
-        // 遍历全部已加载实体，不依赖大范围 AABB 查询
-        for (Entity entity : level.getAllEntities()) {
-            if (!(entity instanceof EntityMaid a)) {
-                continue;
-            }
+        // 使用 maid-only 快照，避免直接迭代 ServerLevel 的 live all-entity collection。
+        for (EntityMaid a : level.getEntities(EntityTypeTest.forClass(EntityMaid.class),
+                maid -> maid.level() == level && !maid.isRemoved())) {
             if (!a.isAlive() || HUG_START_TIMES.containsKey(a.getUUID()) || isCooldown(a, now)) {
                 continue;
             }

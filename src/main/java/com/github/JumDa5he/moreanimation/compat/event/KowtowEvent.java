@@ -7,6 +7,8 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
@@ -46,6 +48,14 @@ public class KowtowEvent {
         // 必须是投射物（火球、箭、雪球等远程击中）
         if (!(source.getDirectEntity() instanceof Projectile) && !source.is(DamageTypeTags.IS_PROJECTILE)) return;
         if (!maid.isAlive()) return;
+        Entity causing = source.getEntity();
+        Player shooter = causing instanceof Player player ? player : null;
+        if (shooter == null && source.getDirectEntity() instanceof Projectile projectile
+                && projectile.getOwner() instanceof Player player) {
+            shooter = player;
+        }
+        if (shooter == null || maid.getOwnerUUID() == null
+                || !maid.getOwnerUUID().equals(shooter.getUUID())) return;
 
         ServerLevel level = (ServerLevel) maid.level();
         long now = level.getGameTime();

@@ -379,8 +379,8 @@ public final class TailInteractionState {
         if (pose == null) return;
         float yaw = pose.yawFor(logicalIndex);
         float pitch = pose.pitchFor(logicalIndex);
-        // Gecko/Blockbench model rotation uses the opposite sign for X/Y from the
-        // maid-local semantic angles produced by the ray projection. Z keeps its sign.
+                                                                                  
+                                                                                       
         bone.setRotationX(bone.getRotationX() - pitch);
         bone.setRotationY(bone.getRotationY() - yaw);
         bone.setRotationZ(bone.getRotationZ() - yaw * 0.08f);

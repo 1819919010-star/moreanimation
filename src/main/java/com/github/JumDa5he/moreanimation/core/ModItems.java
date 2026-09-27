@@ -11,4 +11,6 @@ public class ModItems {
             props -> new ExpressionItem(props.stacksTo(1)));
     public static final DeferredItem<Item> HAND = ITEMS.registerItem("hand",
             props -> new HandItem(props.stacksTo(1)));
+    public static final DeferredItem<Item> JADE_FOOT = ITEMS.registerItem("jade_foot",
+            props -> new JadeFootItem(props.stacksTo(1)));
 }

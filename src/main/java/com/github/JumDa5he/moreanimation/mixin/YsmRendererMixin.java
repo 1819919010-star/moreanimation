@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.mixin;
 
 import com.github.JumDa5he.moreanimation.compat.ysm.YsmAnimationBridge;
+import com.github.JumDa5he.moreanimation.compat.ysm.YsmFaceAnchors;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceLocation;
@@ -36,5 +37,6 @@ public abstract class YsmRendererMixin {
                                      float entityYaw, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
         YsmAnimationBridge.after(animatable, partialTick);
+        YsmFaceAnchors.capture(animatable, poseStack);
     }
 }

@@ -6,11 +6,14 @@ import com.github.JumDa5he.moreanimation.compat.network.PraySyncPacket;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.entity.EntityTypeTest;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -18,6 +21,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +50,8 @@ public class PrayEvent {
     private static final Map<UUID, Long> COOLDOWN_UNTIL = new ConcurrentHashMap<>();
     /** maidUuid -> 神龛位置（祈祷期间持续面向它） */
     private static final Map<UUID, BlockPos> SHRINE_POS = new ConcurrentHashMap<>();
+    /** maidUuid -> 开始祈祷时所在维度，防止跨维度后继续使用旧神龛坐标 */
+    private static final Map<UUID, ResourceKey<Level>> PRAY_DIMENSIONS = new ConcurrentHashMap<>();
 
     @SubscribeEvent
     public static void onServerTick(LevelTickEvent.Post event) {
@@ -59,9 +65,13 @@ public class PrayEvent {
         while (it.hasNext()) {
             Map.Entry<UUID, Long> entry = it.next();
             UUID maidUuid = entry.getKey();
+            if (!level.dimension().equals(PRAY_DIMENSIONS.get(maidUuid))) {
+                continue;
+            }
             if (now >= entry.getValue()) {
                 it.remove();
                 SHRINE_POS.remove(maidUuid);
+                PRAY_DIMENSIONS.remove(maidUuid);
                 COOLDOWN_UNTIL.put(maidUuid, now + COOLDOWN_TICKS);
                 if (level.getEntity(maidUuid) instanceof EntityMaid maid) {
                     sendPrayState(level, maid, false);
@@ -83,10 +93,7 @@ public class PrayEvent {
         if (shrineBlock == null || shrineBlock == Blocks.AIR) {
             return;
         }
-        for (Entity entity : level.getAllEntities()) {
-            if (!(entity instanceof EntityMaid maid)) {
-                continue;
-            }
+        for (EntityMaid maid : loadedMaids(level)) {
             if (!maid.isAlive() || PENDING_ANIMS.containsKey(maid.getUUID())) {
                 continue;
             }
@@ -97,12 +104,30 @@ public class PrayEvent {
             if (shrinePos != null) {
                 PENDING_ANIMS.put(maid.getUUID(), now + PRAY_ANIM_TICKS);
                 SHRINE_POS.put(maid.getUUID(), shrinePos);
+                PRAY_DIMENSIONS.put(maid.getUUID(), level.dimension());
                 freezeAndFace(maid, shrinePos);
                 MaidAnimationData.start(maid, "pray", (int) PRAY_ANIM_TICKS,
                         MaidAnimationData.PRIORITY_INTERACTION, true);
                 sendPrayState(level, maid, true);
             }
         }
+    }
+
+                                                                                                              
+    private static List<? extends EntityMaid> loadedMaids(ServerLevel level) {
+        return level.getEntities(EntityTypeTest.forClass(EntityMaid.class),
+                maid -> maid.level() == level && !maid.isRemoved());
+    }
+
+    @SubscribeEvent
+    public static void onEntityLeave(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide() || !(event.getEntity() instanceof EntityMaid maid)) return;
+        UUID maidUuid = maid.getUUID();
+        if (PENDING_ANIMS.remove(maidUuid) != null) {
+            COOLDOWN_UNTIL.put(maidUuid, event.getLevel().getGameTime() + COOLDOWN_TICKS);
+        }
+        SHRINE_POS.remove(maidUuid);
+        PRAY_DIMENSIONS.remove(maidUuid);
     }
 
     /** 以女仆为中心，SCAN_RADIUS 格内查找神龛方块 */

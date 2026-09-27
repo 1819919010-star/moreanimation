@@ -5,6 +5,7 @@
     "compatibilityLevel": "JAVA_21",
     "mixins": [
         "AnimationManagerMixin",
+        "BrokenLegSpeedMixin",
         "LivingEntityDeathMixin",
         "MaidFollowOwnerTaskMixin",
         "MaidFollowOwnerVehicleTaskMixin"
@@ -12,6 +13,7 @@
     "client": [
         "AnimationProcessorMixin",
         "GeckoMaidEntityMixin",
+        "GeckoFaceAnchorMixin",
         "GeckoModelLoaderMixin",
         "YsmRendererMixin"
     ],

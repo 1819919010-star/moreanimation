@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
 import com.github.JumDa5he.moreanimation.MoreAnimation;
+import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -29,11 +30,8 @@ public record ExpressionPacket(int entityId, String action) implements CustomPac
             ServerLevel level = player.serverLevel();
             if (level.getEntity(message.entityId()) instanceof EntityMaid maid) {
                 if (!maid.isOwnedBy(player) || player.distanceToSqr(maid) > 16 * 16) return;
-                if ("stop".equals(message.action())) {
-                    maid.getPersistentData().remove("moreanimation_expression");
-                } else {
-                    maid.getPersistentData().putString("moreanimation_expression", message.action());
-                }
+                MaidAnimationData.setManualExpression(maid,
+                        "stop".equals(message.action()) ? "" : message.action());
             }
         });
     }

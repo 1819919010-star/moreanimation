@@ -2,6 +2,7 @@ package com.github.JumDa5he.moreanimation.mixin;
 
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.client.TailInteractionState;
+import com.github.JumDa5he.moreanimation.client.FaceInteractionState;
 import com.github.tartaricacid.touhoulittlemaid.client.entity.GeckoMaidEntity;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.controller.AnimationController;
@@ -22,20 +23,29 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.List;
 import java.util.Set;
 
-/** Makes custom expression/interaction layers exclusive only for bones they animate. */
+                                                                                        
 @Mixin(AnimationProcessor.class)
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AnimationProcessorMixin {
+                                                                                 
+    private static final float TLM_SIT2_ROOT_Y = -12.0F;
     private static final Set<String> EXCLUSIVE_INTERACTIONS = Set.of(
-            "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether");
+            "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether",
+            "slapright", "slapleft");
+    @Inject(method = "tickAnimation", at = @At("HEAD"), remap = false)
+    private void moreanimation$restoreFacePose(double seekTime, AnimationEvent event,
+                                               AnimationContext context,
+                                               CallbackInfoReturnable<Boolean> cir) {
+        FaceInteractionState.restoreGecko((AnimationProcessor) (Object) this);
+    }
     @Inject(method = "tickAnimation", at = @At("RETURN"), remap = false)
     private void moreanimation$hideUnusedExpressionSeven(double seekTime, AnimationEvent event,
                                                           AnimationContext context,
                                                           CallbackInfoReturnable<Boolean> cir) {
         IBone expressionSeven = ((AnimationProcessor) (Object) this).getBone("Expression_7");
         if (expressionSeven != null) {
-            // TLM's Wine Fox animations hide unused expressions with scale 0. Apply the same
-            // rule after every controller has committed so a parallel layer cannot reveal it.
+                                                                                             
+                                                                                              
             expressionSeven.setScaleX(0);
             expressionSeven.setScaleY(0);
             expressionSeven.setScaleZ(0);
@@ -43,7 +53,13 @@ public class AnimationProcessorMixin {
         Object animatable = event.getAnimatableEntity();
         if (animatable instanceof GeckoMaidEntity<?> gecko
                 && gecko.getMaid().asEntity() instanceof EntityMaid maid) {
+            if (MaidAnimationData.isActive(maid, "sit2")) {
+                IBone root = ((AnimationProcessor) (Object) this).getBone("Root");
+                if (root == null) root = ((AnimationProcessor) (Object) this).getBone("root");
+                if (root != null) root.setPositionY(TLM_SIT2_ROOT_Y);
+            }
             TailInteractionState.applyGecko((AnimationProcessor) (Object) this, maid);
+            FaceInteractionState.applyGecko((AnimationProcessor) (Object) this, maid);
         }
     }
 
@@ -63,8 +79,8 @@ public class AnimationProcessorMixin {
             BoneTopLevelSnapshot snapshot = queue.topLevelSnapshot;
             BoneSnapshot initial = snapshot.bone.getInitialSnapshot();
 
-            // Preserve skin-defined visibility unless this custom animation explicitly changes
-            // scale. This avoids revealing optional meshes such as Expression_7.
+                                                                                               
+                                                                                 
             boolean changesScale = !queue.scaleQueue().isEmpty();
             float scaleX = snapshot.scaleValueX;
             float scaleY = snapshot.scaleValueY;

@@ -67,7 +67,7 @@ public class HandItem extends Item {
         if (!level.isClientSide() && living instanceof Player player) stopHeldTarget(level, player);
     }
 
-    /** Releasing a short click must not erase the one-shot reaction before a render frame sees it. */
+                                                                                                      
     private static void stopHeldTarget(Level level, Player player) {
         Entity target = level.getEntity(player.getPersistentData().getInt(TARGET_ID));
         if (target instanceof EntityMaid maid && MaidAnimationData.isActive(maid, "pet_reaction_hold")) {

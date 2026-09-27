@@ -36,8 +36,8 @@ public class GeckoModelLoaderMixin {
         AnimationFile additions = moreanimation$getAnimations();
         if (additions != null) {
             additions.animations().forEach((name, animation) -> {
-                // A skin pack's own animation is authoritative. Replacing an existing idle/main
-                // animation can remove its model-specific visibility rules (for example Expression_7).
+                                                                                                
+                                                                                                       
                 if (!animationFile.animations().containsKey(name)) {
                     animationFile.putAnimation(name, animation);
                 }

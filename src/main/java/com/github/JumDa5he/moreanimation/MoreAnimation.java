@@ -5,6 +5,8 @@ import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
 import com.github.JumDa5he.moreanimation.compat.util.CustomPackInstaller;
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
 import com.github.JumDa5he.moreanimation.core.ModItems;
+import com.github.JumDa5he.moreanimation.core.ModCreativeTabs;
+import com.github.JumDa5he.moreanimation.core.ModSounds;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -23,6 +25,8 @@ public class MoreAnimation {
 
         modContainer.registerConfig(ModConfig.Type.COMMON, MoreAnimationConfig.SPEC);
         ModItems.ITEMS.register(modEventBus);
+        ModSounds.SOUNDS.register(modEventBus);
+        ModCreativeTabs.TABS.register(modEventBus);
         modEventBus.addListener(this::addCreativeTabItems);
     }
 
@@ -30,6 +34,7 @@ public class MoreAnimation {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModItems.EXPRESSION_ITEM);
             event.accept(ModItems.HAND);
+            event.accept(ModItems.JADE_FOOT);
         }
     }
 }

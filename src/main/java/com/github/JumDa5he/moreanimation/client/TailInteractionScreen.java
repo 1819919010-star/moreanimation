@@ -10,7 +10,7 @@ public final class TailInteractionScreen extends Screen {
         super(Component.translatable("gui.moreanimation.tail_interaction"));
     }
 
-    /** Keep the in-world view sharp while the transparent drag overlay is open. */
+                                                                                   
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
     }

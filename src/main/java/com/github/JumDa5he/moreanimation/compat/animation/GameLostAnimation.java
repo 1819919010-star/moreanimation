@@ -1,6 +1,7 @@
 package com.github.JumDa5he.moreanimation.compat.animation;
 
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
+import com.github.JumDa5he.moreanimation.compat.event.JadeFootEvent;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationManager;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationState;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.Priority;
@@ -14,6 +15,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.entity.EntityTypeTest;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
@@ -44,6 +46,8 @@ public class GameLostAnimation {
     private static final Map<UUID, Boolean> cakeNear = new ConcurrentHashMap<>();
     private static final Map<UUID, Integer> coldExposureTicks = new ConcurrentHashMap<>();
     private static final Map<UUID, BasePoseSelection> basePoseSelections = new ConcurrentHashMap<>();
+    private static final Map<UUID, Boolean> waterContact = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> waterExitStart = new ConcurrentHashMap<>();
     private static final List<String> SIT_BASE_VARIANTS = List.of("", "sit2");
     private static final List<String> SLEEP_BASE_VARIANTS = List.of(
             "", "moresleep2", "moresleep3", "moresleep4", "moresleep5", "moresleep6");
@@ -74,17 +78,16 @@ public class GameLostAnimation {
         // 服务端逻辑：女仆血量低于 30% 时持续清除寻路目标，直到血量恢复
         NeoForge.EVENT_BUS.addListener((LevelTickEvent.Post event) -> {
             if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
-            for (Entity entity : serverLevel.getAllEntities()) {
-                if (entity instanceof EntityMaid maid && maid.isAlive()) {
-                    if (maid.getHealth() < maid.getMaxHealth() * 0.3f) {
-                        // morebeg 触发期间停止移动，避免跪着走路
-                        maid.getNavigation().stop();
-                        maid.getNavigation().setSpeedModifier(0.0D);
-                        maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
-                        maid.getBrain().eraseMemory(MemoryModuleType.LOOK_TARGET);
-                        maid.getBrain().eraseMemory(MemoryModuleType.PATH);
-                        maid.setDeltaMovement(0, maid.getDeltaMovement().y, 0);
-                    }
+            for (EntityMaid maid : serverLevel.getEntities(EntityTypeTest.forClass(EntityMaid.class),
+                    candidate -> candidate.level() == serverLevel && !candidate.isRemoved())) {
+                if (maid.isAlive() && maid.getHealth() < maid.getMaxHealth() * 0.3f) {
+                    // morebeg 触发期间停止移动，避免跪着走路
+                    maid.getNavigation().stop();
+                    maid.getNavigation().setSpeedModifier(0.0D);
+                    maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+                    maid.getBrain().eraseMemory(MemoryModuleType.LOOK_TARGET);
+                    maid.getBrain().eraseMemory(MemoryModuleType.PATH);
+                    maid.setDeltaMovement(0, maid.getDeltaMovement().y, 0);
                 }
             }
         });
@@ -110,7 +113,7 @@ public class GameLostAnimation {
             lipsCooldown.keySet().retainAll(alive);
         });
 
-        // Forge 1.20 LivingHurtEvent maps to NeoForge 1.21 LivingIncomingDamageEvent.
+                                                                                      
         NeoForge.EVENT_BUS.addListener((LivingIncomingDamageEvent e) -> {
             if (e.getEntity() instanceof EntityMaid maid) {
                 recordPlayerAttack(maid, e.getSource());
@@ -130,7 +133,7 @@ public class GameLostAnimation {
                 (maid, animEvent) -> {
                     EntityMaid entity = (EntityMaid) maid.asEntity();
                     UUID uuid = entity.getUUID();
-                    if (!canClaim(uuid, "come")) return false;
+                    if (!canClaim(entity, "come")) return false;
                     // 物品触发：睡觉且主人主手持末地烛时循环播放
                     if (entity.isSleeping()
                             && entity.getOwner() instanceof Player owner
@@ -156,7 +159,7 @@ public class GameLostAnimation {
                 (maid, animEvent) -> {
                     EntityMaid entity = (EntityMaid) maid.asEntity();
                     UUID uuid = entity.getUUID();
-                    if (!canClaim(uuid, "come2")) return false;
+                    if (!canClaim(entity, "come2")) return false;
                     // 物品触发：坐着且主人主手持末地烛时循环播放
                     if (entity.isMaidInSittingPose()
                             && entity.getOwner() instanceof Player owner
@@ -183,7 +186,7 @@ public class GameLostAnimation {
                 (maid, animEvent) -> {
                     EntityMaid entity = (EntityMaid) maid.asEntity();
                     UUID uuid = entity.getUUID();
-                    if (!canClaim(uuid, "weidu")) return false;
+                    if (!canClaim(entity, "weidu")) return false;
                     if (!entity.isMaidInSittingPose()) {
                         releaseIfMine(uuid, "weidu");
                         return false;
@@ -216,7 +219,7 @@ public class GameLostAnimation {
                 (maid, animEvent) -> {
                     EntityMaid entity = (EntityMaid) maid.asEntity();
                     UUID uuid = entity.getUUID();
-                    if (!canClaim(uuid, "ha")) return false;
+                    if (!canClaim(entity, "ha")) return false;
                     if (!entity.isMaidInSittingPose()) {
                         releaseIfMine(uuid, "ha");
                         return false;
@@ -240,7 +243,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "morebeg")) return false;
+                        if (!canClaim(entity, "morebeg")) return false;
                         float health = entity.getHealth();
                         float maxHealth = entity.getMaxHealth();
                         if (health < maxHealth * 0.3f) {
@@ -260,7 +263,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "sleep2")) return false;
+                        if (!canClaim(entity, "sleep2")) return false;
                         // 物品触发：主人主手持白色羊毛时循环播放
                         if (entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.WHITE_WOOL)) {
                             claim(uuid, "sleep2");
@@ -285,7 +288,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "tastetail")) return false;
+                        if (!canClaim(entity, "tastetail")) return false;
                         boolean sitting = entity.isMaidInSittingPose();
                         boolean ownerHoldingFlesh = entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.ROTTEN_FLESH);
                         if (sitting && ownerHoldingFlesh) {
@@ -332,7 +335,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "eattail")) return false;
+                        if (!canClaim(entity, "eattail")) return false;
                         boolean sitting = entity.isMaidInSittingPose();
                         boolean ownerHoldingFlesh = entity.getOwner() instanceof Player owner && owner.getMainHandItem().is(Items.ROTTEN_FLESH);
                         if (sitting && ownerHoldingFlesh) {
@@ -372,7 +375,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "catchbyhook")) return false;
+                        if (!canClaim(entity, "catchbyhook")) return false;
                         if (entity.level().getEntitiesOfClass(FishingHook.class,
                                 entity.getBoundingBox().inflate(16),
                                 hook -> hook.getHookedIn() == entity).size() > 0) {
@@ -392,7 +395,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "hurt")) return false;
+                        if (!canClaim(entity, "hurt")) return false;
                         Long start = hurtStartTick.get(uuid);
                         if (start != null) {
                             if (entity.tickCount >= start && entity.tickCount - start < HURT_DURATION_TICKS) {
@@ -425,7 +428,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "kowtow")) return false;
+                        if (!canClaim(entity, "kowtow")) return false;
                         if (entity.getPersistentData().getBoolean("moreanimation_kowtow")) {
                             claim(uuid, "kowtow");
                             return true;
@@ -451,7 +454,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "drowning")) return false;
+                        if (!canClaim(entity, "drowning")) return false;
                         if (entity.isInWater() && entity.getAirSupply() <= 0) {
                             claim(uuid, "drowning");
                             return true;
@@ -469,7 +472,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "situp")) return false;
+                        if (!canClaim(entity, "situp")) return false;
                         // 随机调度：睡觉动作池
                         if (entity.isSleeping() && "situp".equals(scheduledAnim(entity, "sleep"))) {
                             claim(uuid, "situp");
@@ -488,7 +491,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "pray")) return false;
+                        if (!canClaim(entity, "pray")) return false;
                         if (entity.getPersistentData().getBoolean("moreanimation_pray")) {
                             claim(uuid, "pray");
                             return true;
@@ -506,7 +509,7 @@ public class GameLostAnimation {
                     (maid, animEvent) -> {
                         EntityMaid entity = (EntityMaid) maid.asEntity();
                         UUID uuid = entity.getUUID();
-                        if (!canClaim(uuid, "watchtombstone")) return false;
+                        if (!canClaim(entity, "watchtombstone")) return false;
                         Long start = tombstoneStartTick.get(uuid);
                         if (start != null) {
                             if (entity.tickCount >= start && entity.tickCount - start < TOMBSTONE_DURATION_TICKS) {
@@ -540,7 +543,7 @@ public class GameLostAnimation {
                 UUID uuid = maid.getUUID();
                 long now = (long) maid.tickCount;
 
-                // Hurt attack counting (melee)
+                                               
                 Long last = lastAttackTime.get(uuid);
                 if (last != null && (now - last) <= ATTACK_WINDOW_TICKS) {
                     attackCount.merge(uuid, 1, Integer::sum);
@@ -550,15 +553,23 @@ public class GameLostAnimation {
                 lastAttackTime.put(uuid, now);
 
                 // Kowtow trigger (ranged): 客户端本地判定，单机/局域网直接触发
-                if (e.getSource().getDirectEntity() instanceof Projectile) {
-                    kowtowStartTick.putIfAbsent(uuid, now);
+                if (e.getSource().getDirectEntity() instanceof Projectile projectile) {
+                    Entity causing = e.getSource().getEntity();
+                    Player shooter = causing instanceof Player player ? player
+                            : projectile.getOwner() instanceof Player player ? player : null;
+                    if (shooter != null && maid.getOwnerUUID() != null
+                            && maid.getOwnerUUID().equals(shooter.getUUID())) {
+                        kowtowStartTick.putIfAbsent(uuid, now);
+                    }
                 }
             });
     }
 
-    /** Publishes legacy Gecko conditions through the shared state consumed by Gecko and YSM. */
+                                                                                                
     public static void serverTick(EntityMaid maid) {
-        if (maid.level().isClientSide() || !maid.isAlive()) return;
+        if (maid.level().isClientSide()) return;
+        JadeFootEvent.serverTick(maid);
+        if (!maid.isAlive()) return;
         if (MaidAnimationData.isTailInteractionActive(maid)) {
             UUID uuid = maid.getUUID();
             SCHEDULED.remove(uuid);
@@ -568,6 +579,7 @@ public class GameLostAnimation {
             return;
         }
 
+        tickWaterShake(maid);
         tickTimedConditions(maid);
         Desired desired = desiredContinuousAction(maid);
         String current = MaidAnimationData.activeAction(maid);
@@ -630,6 +642,17 @@ public class GameLostAnimation {
 
     private static Desired desiredContinuousAction(EntityMaid maid) {
         String basePoseAction = selectedBasePoseAction(maid);
+        if (maid.isSleeping()) {
+            if (ownerHolds(maid, Items.END_ROD)) {
+                return desired("come", MaidAnimationData.PRIORITY_MANUAL, false);
+            }
+            String scheduled = scheduledAnim(maid, "sleep");
+            if (scheduled != null) {
+                return desired(scheduled, MaidAnimationData.PRIORITY_RANDOM, false);
+            }
+            return basePoseAction == null ? null
+                    : desired(basePoseAction, MaidAnimationData.PRIORITY_RANDOM, false);
+        }
         boolean coldLongEnough = tickColdExposure(maid);
         if (maid.getHealth() < maid.getMaxHealth() * 0.3f) {
             return desired("morebeg", MaidAnimationData.PRIORITY_INJURED, true);
@@ -710,7 +733,7 @@ public class GameLostAnimation {
         return null;
     }
 
-    /** Select once when entering the real TLM sit/sleep state; an empty action keeps the original pose. */
+                                                                                                           
     private static String selectedBasePoseAction(EntityMaid maid) {
         String state = maid.isSleeping() ? "sleep" : maid.isMaidInSittingPose() ? "sit" : "";
         UUID uuid = maid.getUUID();
@@ -731,7 +754,7 @@ public class GameLostAnimation {
         return selected.action().isEmpty() ? null : selected.action();
     }
 
-    /** Five uninterrupted seconds in powder snow are required; leaving it resets the accumulation. */
+                                                                                                      
     private static boolean tickColdExposure(EntityMaid maid) {
         net.minecraft.core.BlockPos feet = maid.blockPosition();
         boolean cold = maid.level().getBlockState(feet).is(net.minecraft.world.level.block.Blocks.POWDER_SNOW)
@@ -744,6 +767,25 @@ public class GameLostAnimation {
         int ticks = Math.min(COLD_TRIGGER_TICKS, coldExposureTicks.getOrDefault(uuid, 0) + 1);
         coldExposureTicks.put(uuid, ticks);
         return ticks >= COLD_TRIGGER_TICKS;
+    }
+
+                                                                                                    
+    private static void tickWaterShake(EntityMaid maid) {
+        UUID uuid = maid.getUUID();
+        long now = maid.level().getGameTime();
+        if (maid.isInWaterOrBubble()) {
+            waterContact.put(uuid, true);
+            waterExitStart.remove(uuid);
+            return;
+        }
+        if (!waterContact.getOrDefault(uuid, false)) return;
+        Long exitStart = waterExitStart.putIfAbsent(uuid, now);
+        if (exitStart == null || now - exitStart < 40L) return;
+        if (MaidAnimationData.start(maid, "water_shake", MaidAnimationData.duration("water_shake"),
+                MaidAnimationData.PRIORITY_WATER_SHAKE, false)) {
+            waterContact.remove(uuid);
+            waterExitStart.remove(uuid);
+        }
     }
 
     private static Desired desired(String action, int priority, boolean lockMovement) {
@@ -796,9 +838,33 @@ public class GameLostAnimation {
         cakeNear.remove(uuid);
         coldExposureTicks.remove(uuid);
         basePoseSelections.remove(uuid);
+        waterContact.remove(uuid);
+        waterExitStart.remove(uuid);
         SCHEDULED.remove(uuid);
         ACTIVE.remove(uuid);
+        MaidAnimationData.clearTransientExpression(maid);
+        JadeFootEvent.clear(maid);
         clearManaged(maid);
+    }
+
+    public static void clearAll() {
+        tasteStartTick.clear();
+        attackCount.clear();
+        lastAttackTime.clear();
+        hurtStartTick.clear();
+        kowtowStartTick.clear();
+        tombstoneStartTick.clear();
+        tombstoneCooldown.clear();
+        lipsWatchStart.clear();
+        lipsCooldown.clear();
+        cakeNear.clear();
+        coldExposureTicks.clear();
+        basePoseSelections.clear();
+        waterContact.clear();
+        waterExitStart.clear();
+        SCHEDULED.clear();
+        ACTIVE.clear();
+        JadeFootEvent.clearAll();
     }
 
     private static void clearManaged(EntityMaid maid) {
@@ -905,8 +971,8 @@ public class GameLostAnimation {
             }
             SCHEDULED.remove(uuid);
         }
-        // Existing schedules must remain visible while their shared action is active.
-        // Checking this before SCHEDULED caused a stop/restart every other tick.
+                                                                                      
+                                                                                 
         String activeAction = MaidAnimationData.activeAction(entity);
         if (!activeAction.isEmpty() && !BASE_POSE_ACTIONS.contains(activeAction)) return null;
         long interval = MoreAnimationConfig.getIntervalTicks(state);
@@ -956,7 +1022,9 @@ public class GameLostAnimation {
     }
 
     /** 全局互斥：该女仆当前是否被其他动画占用（自己已占用则放行续播） */
-    private static boolean canClaim(UUID uuid, String name) {
+    private static boolean canClaim(EntityMaid entity, String name) {
+        if (entity.isSleeping() && !MaidAnimationData.isAllowedWhileSleeping(name)) return false;
+        UUID uuid = entity.getUUID();
         String cur = ACTIVE.get(uuid);
         return cur == null || cur.equals(name);
     }

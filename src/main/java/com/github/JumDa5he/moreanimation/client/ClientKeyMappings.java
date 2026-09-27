@@ -16,6 +16,11 @@ public final class ClientKeyMappings {
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_V,
             "key.categories.moreanimation");
+    public static final KeyMapping FACE_INTERACTION = new KeyMapping(
+            "key.moreanimation.face_interaction",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_B,
+            "key.categories.moreanimation");
 
     private ClientKeyMappings() {
     }
@@ -23,5 +28,6 @@ public final class ClientKeyMappings {
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
         event.register(TAIL_INTERACTION);
+        event.register(FACE_INTERACTION);
     }
 }

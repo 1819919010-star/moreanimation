@@ -41,7 +41,8 @@ public final class YsmAnimationBridge {
             "kick_butt", "kick_launch_front", "catchbyhook", "hurt", "kowtow",
             "drowning", "pray", "watchtombstone", "CLEANTAIL", "game_lost2", "tailcircle", "tailpull",
             "ear_pull_left", "ear_pull_right", "hang", "dance1", "lips",
-            "beg2", "fallen_broken_leg", "broken_leg_crawl", "slapright", "slapleft");
+            "beg2", "fallen_broken_leg", "broken_leg_crawl", "slapright", "slapleft",
+            "hand_hold_front_start", "hand_hold_front_hold", "hand_hold_front_end", "hand_hold_rejected");
                                                                                      
     private static final Set<String> SUPPORTED_EXPRESSIONS = Set.of(
             "veryangry", "wuyu", "sosad", "provoke", "lips", "sneer", "dizziness", "kuang", "uhoh");
@@ -174,14 +175,14 @@ public final class YsmAnimationBridge {
             }
 
             boolean applyAction = SUPPORTED_ACTIONS.contains(action);
+            applyAction &= !com.github.JumDa5he.moreanimation.client.CuteYsmOrder.bodyBusy(maid);
             boolean applyExpression = SUPPORTED_EXPRESSIONS.contains(expression);
             boolean tailExclusive = TailInteractionState.isInteractionActive(maid.getId());
             if (tailExclusive) {
                 applyAction = false;
                 applyExpression = false;
             }
-            TailInteractionState.PoseSnapshot tailPose = TailInteractionState.poseFor(maid.getId());
-            boolean applyTail = tailPose != null;
+            boolean applyTail = TailInteractionState.hasPose(maid.getId());
             FaceInteractionState.PoseSnapshot facePose = FaceInteractionState.poseFor(maid.getId());
             boolean applyFace = facePose != null;
             if (!applyAction && !applyExpression && !applyTail && !tailExclusive && !applyFace) return;
@@ -201,6 +202,13 @@ public final class YsmAnimationBridge {
                     clips = Map.of();
                     LOG.error("YSM animation resource unavailable; procedural poses remain enabled", error);
                 }
+                Map<String, YsmAnimationClip> combined = new HashMap<>(clips);
+                try (var reader = resources.openAsReader(ResourceLocation.fromNamespaceAndPath("moreanimation", "animation/hold_hand.animation.json"))) {
+                    combined.putAll(YsmAnimationClip.read(reader, com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS));
+                } catch (java.io.IOException | RuntimeException error) {
+                    LOG.error("无法读取独立牵手动画，保留其他动作", error);
+                }
+                clips = combined;
                 resourceManager = resources;
             }
             applyAction &= clips.containsKey(action);
@@ -233,21 +241,35 @@ public final class YsmAnimationBridge {
             }
             if (applyAction) {
                 YsmAnimationClip clip = clips.get(action);
+                if (com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action)) {
+                    Set<String> owned = new HashSet<>();
+                    for (var channel : clip.channels) owned.add(channel.bone());
+                    for (String key : owned) {
+                        Object bone = byName.get(key);
+                        if (bone == null) bone = byNormalizedName.get(key.toLowerCase(Locale.ROOT));
+                        if (bone == null) continue;
+                        Vector3f initial = (Vector3f) bind.invoke(bone);
+                        for (int component = 0; component < 6; component++) {
+                            saved.add(new Saved(bone, component, ((Number) GET[component].invoke(bone)).floatValue()));
+                            SET[component].invoke(bone, component < 3 ? initial.get(component) : 0f);
+                        }
+                    }
+                }
                 double elapsedSeconds = (now - actionStart + partialTick) / 20.0;
                 double seconds = MaidAnimationData.isLoopingAction(action)
                         ? Math.max(0, elapsedSeconds) % clip.length
                         : Math.min(clip.length, Math.max(0, elapsedSeconds));
                 applyClip(action, clip, seconds, byName, byNormalizedName, saved, missingBones, false,
-                        maid.getHealth(), maid.getMaxHealth());
+                        maid.getHealth(), maid.getMaxHealth(), maid);
             }
             if (applyExpression) {
                 YsmAnimationClip clip = clips.get(expression);
                 double elapsedSeconds = (now - previousExpression.start() + partialTick) / 20.0;
                 applyClip(expression, clip, Math.max(0, elapsedSeconds) % clip.length,
                         byName, byNormalizedName, saved, missingExpressionBones, true,
-                        maid.getHealth(), maid.getMaxHealth());
+                        maid.getHealth(), maid.getMaxHealth(), maid);
             }
-            if (applyTail) applyProceduralTail(tailPose, byName, saved);
+            if (applyTail) applyProceduralTail(maid.getId(), runtime, byName, saved);
             if (applyFace) applyProceduralFace(facePose, byName, saved);
             if (actionChanged) {
                 LOG.debug("YSM animation action {} applied {} bone components to maid {}",
@@ -361,12 +383,16 @@ public final class YsmAnimationBridge {
         }
         return null;
     }
-    private static void applyProceduralTail(TailInteractionState.PoseSnapshot pose,
+    private static void applyProceduralTail(int maidId, Object runtime,
                                             Map<String, Object> byName,
                                             List<Saved> saved) throws ReflectiveOperationException {
+        var bindings = YsmTailAnchors.layout(runtime, byName).bindings();
         for (Map.Entry<String, Object> entry : byName.entrySet()) {
-            int segment = TailInteractionState.segmentForBone(entry.getKey());
-            if (segment < 0) continue;
+            var binding = bindings.get(entry.getKey());
+            if (binding == null) continue;
+            var pose = TailInteractionState.poseFor(maidId, binding.tailId());
+            if (pose == null) continue;
+            int segment = binding.segment();
             Object bone = entry.getValue();
             float rotationX = ((Number) GET[0].invoke(bone)).floatValue();
             float rotationY = ((Number) GET[1].invoke(bone)).floatValue();
@@ -403,7 +429,7 @@ public final class YsmAnimationBridge {
                                   Map<String, Object> byName,
                                   Map<String, Object> byNormalizedName, List<Saved> saved,
                                   Set<String> missingBones, boolean expressionOverlay,
-                                  float health, float maxHealth) throws ReflectiveOperationException {
+                                  float health, float maxHealth, EntityMaid maid) throws ReflectiveOperationException {
         if (invalidSampleClips.contains(animation)) return;
         List<float[]> samples = new ArrayList<>(clip.channels.size());
         try {
@@ -416,6 +442,7 @@ public final class YsmAnimationBridge {
         int channelIndex = 0;
         for (var channel : clip.channels) {
             float[] values = samples.get(channelIndex++);
+            if (expressionOverlay && com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.owns(maid, channel.bone())) continue;
             Object bone = byName.get(channel.bone());
             if (bone == null) bone = byNormalizedName.get(channel.bone().toLowerCase(Locale.ROOT));
             if (bone == null) {

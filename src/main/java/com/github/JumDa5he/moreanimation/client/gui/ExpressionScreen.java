@@ -109,14 +109,14 @@ public class ExpressionScreen extends Screen {
         addToggle(x + 186, y, 178, Component.translatable(autoHug
                         ? "gui.moreanimation.auto_hug.on" : "gui.moreanimation.auto_hug.off"), autoHug,
                 () -> { autoHug = !autoHug; sendControl("auto_hug", "", "", autoHug); rebuild(); });
-        String[] interactions = {"pet_owner", "pet_maid", "hug_owner", "hug_maid"};
+        String[] interactions = {"pet_owner", "pet_maid", "hug_owner", "hug_maid", "hand_hold"};
         for (int i = 0; i < interactions.length; i++) {
             String interaction = interactions[i];
             addAction(x + (i % 2) * 186, y + 38 + (i / 2) * 31, 178,
                     "gui.moreanimation.interaction." + interaction,
                     () -> sendControl("interaction", "", interaction, true));
         }
-        graphicsHintButton(x, y + 108);
+        graphicsHintButton(x, y + 139);
     }
 
     private void graphicsHintButton(int x, int y) {

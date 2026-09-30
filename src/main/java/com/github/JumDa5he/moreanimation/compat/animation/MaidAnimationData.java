@@ -69,7 +69,7 @@ public final class MaidAnimationData {
             "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether",
             "lips", "ear_pull_left", "ear_pull_right", "hang", "game_lost2", "tailcircle", "dance1",
             "circledance", "CLEANTAIL", "!??!", "beg2", "fallen_broken_leg", "broken_leg_crawl",
-            "slapright", "slapleft");
+            "slapright", "slapleft", "sit2");
     private static final Set<String> LOOPING_ACTIONS = Set.of(
             "come", "come2", "weidu", "ha", "morebeg", "sleep2", "eattail", "catchbyhook",
             "drowning", "situp", "pet_reaction_hold", "pet_other_head", "tailpull", "lips",
@@ -90,11 +90,11 @@ public final class MaidAnimationData {
     }
 
     public static boolean isParallelAction(String action) {
-        return PARALLEL_ACTIONS.contains(action);
+        return PARALLEL_ACTIONS.contains(action) || StandingHandAnimations.ACTIONS.contains(action);
     }
 
     public static boolean isLoopingAction(String action) {
-        return LOOPING_ACTIONS.contains(action);
+        return LOOPING_ACTIONS.contains(action) || StandingHandAnimations.HOLD.equals(action);
     }
 
     public static List<String> enabledActions(EntityMaid maid, String category) {
@@ -215,6 +215,9 @@ public final class MaidAnimationData {
     }
 
     public static boolean start(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.permitsBody(maid, action, priority)) return false;
+        if (com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.controls(maid)
+                && !StandingHandAnimations.ACTIONS.contains(action) && priority < PRIORITY_DEATH) return false;
         long now = maid.level().getGameTime();
         CompoundTag data = maid.getPersistentData();
         if (data.getBoolean(TAIL_INTERACTION_ACTIVE) && priority < PRIORITY_DEATH) return false;
@@ -234,6 +237,7 @@ public final class MaidAnimationData {
     }
 
     public static void clientStart(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.permitsBody(maid, action, priority)) return;
         CompoundTag data = maid.getPersistentData();
         data.putString(ACTIVE, action);
         data.putLong(ACTIVE_START, maid.level().getGameTime());
@@ -266,6 +270,13 @@ public final class MaidAnimationData {
         data.remove(ACTIVE_LOCK_MOVEMENT);
         String active = GameLostAnimation.ACTIVE.get(maid.getUUID());
         if (active != null && active.startsWith("special:")) GameLostAnimation.ACTIVE.remove(maid.getUUID());
+    }
+
+    public static void clientStartAt(EntityMaid maid, String action, long since, int duration, int priority) {
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.permitsBody(maid, action, priority)) return;
+        clientStart(maid, action, duration, priority, false);
+        maid.getPersistentData().putLong(ACTIVE_START, since);
+        maid.getPersistentData().putLong(ACTIVE_UNTIL, since + duration);
     }
 
     public static boolean isActive(EntityMaid maid) {

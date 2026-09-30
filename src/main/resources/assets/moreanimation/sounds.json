@@ -7,5 +7,14 @@
         "stream": false
       }
     ]
+  },
+  "tail_sniff": {
+    "subtitle": "subtitles.moreanimation.tail_sniff",
+    "sounds": [
+      {
+        "name": "moreanimation:tail_sniff",
+        "stream": true
+      }
+    ]
   }
 }

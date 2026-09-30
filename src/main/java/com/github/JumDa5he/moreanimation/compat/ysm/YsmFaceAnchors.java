@@ -101,6 +101,7 @@ public final class YsmFaceAnchors {
             }
 
             Object commonEar = named.get("ear");
+            Matrix4f inverseHead = new Matrix4f(head).invert();
             for (String side : List.of("left", "right")) {
                 Object ear = side.equals("left") ? leftEar : rightEar;
                 if (ear == null) continue;
@@ -108,9 +109,19 @@ public final class YsmFaceAnchors {
                 if (commonEar != null) RenderUtils.prepMatrixForBone(earStack, locate(commonEar));
                 RenderUtils.prepMatrixForBone(earStack, locate(ear));
                 Vector3f root = pivot(ear).div(16f);
-                anchors.put(side + "EarRoot", earStack.last().pose().transformPosition(new Vector3f(root)));
-                anchors.put(side + "Ear", earStack.last().pose().transformPosition(
-                        new Vector3f(root).add(0, halfWidth * 0.65f, 0)));
+                Vector3f renderedRoot = earStack.last().pose().transformPosition(new Vector3f(root));
+                anchors.put(side + "EarRoot", renderedRoot);
+                Vector3f center = earStack.last().pose().transformPosition(
+                        new Vector3f(root).add(0, halfWidth * 0.65f, 0));
+                // 耳骨骼的局部 X 轴可能已旋转朝内；完成耳部变换后，沿头部左右轴向外偏移。
+                // 耳根保持不变，实际命中与调试圈共用此中心。
+                if (inverseHead.isFinite()) {
+                    float outward = Math.signum(inverseHead.transformPosition(new Vector3f(renderedRoot)).x);
+                    inverseHead.transformPosition(center);
+                    center.add(outward * halfWidth * 0.70f, -halfWidth * 0.20f, 0);
+                    head.transformPosition(center);
+                }
+                anchors.put(side + "Ear", center);
             }
             FaceHitProjection.capture(maid.getId(), head, halfWidth, halfWidth, anchors);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {

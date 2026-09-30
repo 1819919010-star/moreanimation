@@ -1,32 +1,22 @@
 package com.github.JumDa5he.moreanimation.client;
 
 import com.github.JumDa5he.moreanimation.MoreAnimation;
-import com.github.JumDa5he.moreanimation.compat.network.TailInteractionRequestPacket;
-import com.github.JumDa5he.moreanimation.compat.network.TailPoseUpdatePacket;
+import com.github.JumDa5he.moreanimation.compat.network.*;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.processor.AnimationProcessor;
-import com.github.tartaricacid.touhoulittlemaid.geckolib3.core.processor.IBone;
-import net.minecraft.client.Camera;
+import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
+import java.util.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-@EventBusSubscriber(modid = MoreAnimation.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid=MoreAnimation.MOD_ID,value=Dist.CLIENT)
 public final class TailInteractionState {
     private static final double SEARCH_DISTANCE = 6.0;
     public static final float TAIL_DRAG_SENSITIVITY = 1.85f;
@@ -42,421 +32,183 @@ public final class TailInteractionState {
     private static final float[] CHAIN_STIFFNESS = {0.40f, 0.18f, 0.12f, 0.085f, 0.060f, 0.045f, 0.034f};
     private static final float[] CHAIN_DAMPING = {0.50f, 0.69f, 0.78f, 0.84f, 0.87f, 0.90f, 0.92f};
     private static final float[] CHAIN_VELOCITY_TRANSFER = {0.0f, 0.46f, 0.56f, 0.64f, 0.71f, 0.77f, 0.82f};
-    private static final Map<Integer, SmoothedPose> POSES = new HashMap<>();
 
-    private static boolean active;
-    private static int maidId = -1;
-    private static boolean sittingBase;
-    private static boolean grabbed;
-    private static boolean pointerOverTail;
-    private static boolean pointerInSafeZone = true;
-    private static boolean overstretchActive;
-    private static float candidateYaw;
-    private static float candidatePitch;
+    private static final Map<Integer,Map<String,SmoothedPose>> POSES=new HashMap<>();
+    private static final Map<Integer,Boolean> INTERACTIONS=new HashMap<>();
+    private static boolean active,grabbed,pointerOverTail,overstretchActive,invalidModel;
+    private static int maidId=-1,syncTicker;
+    private static String selected="";
+    private static Vec3 dragCenter,dragOrigin;
+    private static float startYaw,startPitch,lastSentYaw=Float.NaN,lastSentPitch=Float.NaN;
     private static long interactionStartTime;
-    private static int syncTicker;
-    private static float lastSentYaw = Float.NaN;
-    private static float lastSentPitch = Float.NaN;
-    private static boolean lastSentOverstretch;
+    private static Object currentLevel;
+    private TailInteractionState(){}
 
-    private TailInteractionState() {
-    }
-
-    @SubscribeEvent
-    public static void clientTick(ClientTickEvent.Post event) {
-        Minecraft mc = Minecraft.getInstance();
-
-        while (ClientKeyMappings.TAIL_INTERACTION.consumeClick()) {
-            if (active) {
-                requestStop();
-                if (mc.screen instanceof TailInteractionScreen screen) screen.closeFromServer();
-            } else if (mc.screen == null) {
-                requestNearestMaid();
-            }
+    @SubscribeEvent public static void clientTick(net.neoforged.neoforge.client.event.ClientTickEvent.Post event){
+        
+        Minecraft mc=Minecraft.getInstance();
+        checkLevel();
+        INTERACTIONS.keySet().removeIf(id -> mc.level==null || !(mc.level.getEntity(id) instanceof EntityMaid));
+        while(ClientKeyMappings.TAIL_INTERACTION.consumeClick()){
+            if(active)requestStop();else if(mc.screen==null)requestNearestMaid();
         }
-
-        if (active) {
-            if (mc.player == null || mc.level == null || !mc.player.isAlive()
-                    || !(mc.level.getEntity(maidId) instanceof EntityMaid maid) || !maid.isAlive()
-                    || mc.player.distanceToSqr(maid) > 64.0
-                    || !(mc.screen instanceof TailInteractionScreen)) {
-                requestStop();
-            } else {
-                if (grabbed && GLFW.glfwGetMouseButton(mc.getWindow().getWindow(),
-                        GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS) {
-                    releaseGrab();
-                }
-                mc.options.keyUp.setDown(false);
-                mc.options.keyDown.setDown(false);
-                mc.options.keyLeft.setDown(false);
-                mc.options.keyRight.setDown(false);
-                mc.options.keyJump.setDown(false);
-                mc.options.keyShift.setDown(false);
+        while(ClientKeyMappings.TAIL_SNIFF.consumeClick())if(active)beginSniff();
+        if(active){
+            if(invalidModel||mc.player==null||mc.level==null||!mc.player.isAlive()
+                    ||!(mc.level.getEntity(maidId) instanceof EntityMaid maid)||!maid.isAlive()
+                    ||mc.player.distanceToSqr(maid)>64||!(mc.screen instanceof TailInteractionScreen))requestStop();
+            else {
+                if(!selected.isEmpty() && TailHitProjection.find(selected)==null && TailHitProjection.stale())requestStop();
+                if(active&&grabbed&&GLFW.glfwGetMouseButton(mc.getWindow().getWindow(),GLFW.GLFW_MOUSE_BUTTON_LEFT)!=GLFW.GLFW_PRESS)releaseGrab();
+                mc.options.keyUp.setDown(false);mc.options.keyDown.setDown(false);mc.options.keyLeft.setDown(false);
+                mc.options.keyRight.setDown(false);mc.options.keyJump.setDown(false);mc.options.keyShift.setDown(false);
                 mc.player.setDeltaMovement(Vec3.ZERO);
-                syncLocalPose();
+                TailSniffCamera.tick();
+                if(active&&grabbed&&++syncTicker>=3){syncTicker=0;SmoothedPose pose=localPose();
+                    sendPose(true,false);}
             }
         }
-
-        Iterator<Map.Entry<Integer, SmoothedPose>> iterator = POSES.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<Integer, SmoothedPose> entry = iterator.next();
-            SmoothedPose pose = entry.getValue();
-            if (entry.getKey() != maidId && mc.level != null && mc.level.getEntity(entry.getKey()) == null) {
-                pose.setInteraction(false, false);
-                pose.setTarget(0, 0, false);
-            }
-            pose.tick();
-            if (entry.getKey() != maidId && pose.canDiscard()) iterator.remove();
+        var entities=POSES.entrySet().iterator();
+        while(entities.hasNext()){
+            var entity=entities.next();
+            if(mc.level==null||mc.level.getEntity(entity.getKey())==null){INTERACTIONS.remove(entity.getKey());entities.remove();continue;}
+            var tails=entity.getValue().values().iterator();
+            while(tails.hasNext()){var pose=tails.next();pose.tick();if(pose.canDiscard())tails.remove();}
+            if(entity.getValue().isEmpty()&&!INTERACTIONS.containsKey(entity.getKey()))entities.remove();
         }
     }
-
-    @SubscribeEvent
-    public static void loggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
-        forceClear();
+    @SubscribeEvent public static void loggingOut(ClientPlayerNetworkEvent.LoggingOut event){
+        clearLocal();POSES.clear();INTERACTIONS.clear();GeckoTailAnchors.clear();currentLevel=null;
     }
-
-    private static void requestNearestMaid() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
-        List<EntityMaid> maids = new ArrayList<>(mc.level.getEntitiesOfClass(EntityMaid.class,
-                mc.player.getBoundingBox().inflate(SEARCH_DISTANCE),
-                maid -> maid.isAlive() && maid.isOwnedBy(mc.player)));
-        EntityMaid nearest = maids.stream().min((a, b) -> Double.compare(
-                mc.player.distanceToSqr(a), mc.player.distanceToSqr(b))).orElse(null);
-        if (nearest == null) {
-            mc.player.displayClientMessage(Component.translatable("message.moreanimation.no_tail_target"), true);
-            return;
-        }
-        PacketDistributor.sendToServer(new TailInteractionRequestPacket(nearest.getId(), true));
+    private static void checkLevel(){
+        var level=Minecraft.getInstance().level;
+        if(currentLevel!=level){endConfirmed();POSES.clear();INTERACTIONS.clear();GeckoTailAnchors.clear();currentLevel=level;}
     }
-
-    public static void beginConfirmed(int entityId, boolean useSittingBase) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null || !(mc.level.getEntity(entityId) instanceof EntityMaid)) return;
-        active = true;
-        maidId = entityId;
-        sittingBase = useSittingBase;
-        grabbed = false;
-        pointerOverTail = false;
-        interactionStartTime = mc.level.getGameTime();
-        syncTicker = 0;
-        lastSentYaw = Float.NaN;
-        lastSentPitch = Float.NaN;
-        lastSentOverstretch = false;
-        overstretchActive = false;
-        pointerInSafeZone = true;
-        POSES.computeIfAbsent(entityId, ignored -> new SmoothedPose())
-                .setInteraction(true, useSittingBase);
-        POSES.get(entityId).setTarget(0, 0, false);
-        mc.setScreen(new TailInteractionScreen());
+    private static void requestNearestMaid(){
+        var mc=Minecraft.getInstance();if(mc.player==null||mc.level==null)return;
+        EntityMaid maid=mc.level.getEntitiesOfClass(EntityMaid.class,mc.player.getBoundingBox().inflate(SEARCH_DISTANCE),
+                m->m.isAlive()&&m.isOwnedBy(mc.player)).stream().min(Comparator.comparingDouble(mc.player::distanceToSqr)).orElse(null);
+        if(maid==null){mc.player.displayClientMessage(Component.translatable("message.moreanimation.no_tail_target"),true);return;}
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new TailInteractionRequestPacket(maid.getId(),true));
     }
-
-    public static void endConfirmed() {
-        int oldMaid = maidId;
-        active = false;
-        maidId = -1;
-        sittingBase = false;
-        grabbed = false;
-        pointerOverTail = false;
-        overstretchActive = false;
-        SmoothedPose pose = POSES.get(oldMaid);
-        if (pose != null) {
-            pose.setInteraction(false, false);
-            pose.setTarget(0, 0, false);
-        }
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.screen instanceof TailInteractionScreen screen) screen.closeFromServer();
+    public static void beginConfirmed(int id,boolean sitting){
+        checkLevel();
+        var mc=Minecraft.getInstance();if(mc.player==null||mc.level==null||!(mc.level.getEntity(id) instanceof EntityMaid))return;
+        clearLocal();active=true;maidId=id;INTERACTIONS.put(id,sitting);POSES.remove(id);
+        interactionStartTime=mc.level.getGameTime();mc.setScreen(new TailInteractionScreen());
     }
-
-    public static void requestStop() {
-        if (!active) return;
-        int oldMaid = maidId;
-        active = false;
-        maidId = -1;
-        sittingBase = false;
-        grabbed = false;
-        pointerOverTail = false;
-        overstretchActive = false;
-        SmoothedPose pose = POSES.get(oldMaid);
-        if (pose != null) {
-            pose.setInteraction(false, false);
-            pose.setTarget(0, 0, false);
-        }
-        PacketDistributor.sendToServer(new TailInteractionRequestPacket(oldMaid, false));
+    private static void clearLocal(){
+        TailSniffCamera.clear();TailHitProjection.clear();selected="";dragCenter=dragOrigin=null;
+        int old=maidId;INTERACTIONS.remove(old);POSES.remove(old);
+        active=grabbed=pointerOverTail=overstretchActive=invalidModel=false;maidId=-1;syncTicker=0;
+        lastSentYaw=lastSentPitch=Float.NaN;
     }
+    public static void endConfirmed(){clearLocal();var mc=Minecraft.getInstance();if(mc.screen instanceof TailInteractionScreen s)s.closeFromServer();}
+    public static void requestStop(){if(!active)return;int id=maidId;endConfirmed();
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new TailInteractionRequestPacket(id,false));}
+    public static boolean wantsAnchors(int id){return active&&maidId==id&&!invalidModel;}
+    public static void modelChanged(){invalidModel=true;}
+    public static String selectedTail(){return selected;}
+    public static void selectDefault(String id){if(selected.isEmpty())selected=id;}
+    public static boolean isSniffing(){return TailSniffCamera.active();}
+    private static SmoothedPose localPose(){return pose(maidId,selected);}
+    private static SmoothedPose pose(int id,String tail){return POSES.computeIfAbsent(id,k->new HashMap<>()).computeIfAbsent(tail,k->new SmoothedPose());}
 
-    private static void forceClear() {
-        active = false;
-        maidId = -1;
-        sittingBase = false;
-        grabbed = false;
-        pointerOverTail = false;
-        overstretchActive = false;
-        POSES.clear();
+    public static boolean beginGrab(double x,double y){
+        if(!active||isSniffing())return false;
+        var hit=TailHitProjection.hit(x,y);if(hit==null)return false;
+        selected=hit.id();dragCenter=hit.center();dragOrigin=onPlane(x,y,dragCenter);if(dragOrigin==null)return false;
+        SmoothedPose p=localPose();p.frozen=false;startYaw=p.currentYaw[0]/CHAIN_WEIGHTS[0];startPitch=p.currentPitch[0]/CHAIN_WEIGHTS[0];
+        grabbed=true;p.setTarget(startYaw,startPitch,true);overstretchActive=!safeZone(x,y);sendPose(true,false);return true;
     }
-
-    public static boolean beginGrab(double mouseX, double mouseY) {
-        updatePointer(mouseX, mouseY);
-        if (!active || !pointerOverTail) return false;
-        grabbed = true;
-        overstretchActive = !pointerInSafeZone;
-        POSES.computeIfAbsent(maidId, ignored -> new SmoothedPose())
-                .setTarget(candidateYaw, candidatePitch, true);
-        sendPose(true);
-        return true;
+    public static void releaseGrab(){
+        if(!grabbed)return;grabbed=false;overstretchActive=false;dragCenter=dragOrigin=null;
+        localPose().setTarget(0,0,false);sendPose(false,false);
     }
-
-    public static void releaseGrab() {
-        if (!grabbed) return;
-        grabbed = false;
-        overstretchActive = false;
-        SmoothedPose pose = POSES.get(maidId);
-        if (pose != null) pose.setTarget(0, 0, false);
-        sendPose(false);
+    public static void updatePointer(double x,double y){
+        if(!active||isSniffing()){pointerOverTail=false;return;}
+        pointerOverTail=TailHitProjection.hit(x,y)!=null;
+        if(!grabbed||dragOrigin==null)return;
+        var mc=Minecraft.getInstance();if(mc.level==null||!(mc.level.getEntity(maidId) instanceof EntityMaid maid))return;
+        Vec3 target=onPlane(x,y,dragCenter);if(target==null)return;
+        Vec3 f=Vec3.directionFromRotation(0,maid.getYRot()),right=new Vec3(f.z,0,-f.x);
+        Vec3 delta=target.subtract(dragOrigin);
+        float yaw=softLimit(startYaw+(float)Math.atan2(delta.dot(right),.68)*TAIL_DRAG_SENSITIVITY,MAX_TAIL_YAW,MAX_TAIL_YAW);
+        float pitch=softLimit(startPitch+(float)Math.atan2(delta.y,Math.sqrt(.68*.68+Math.pow(delta.dot(right),2)))*TAIL_DRAG_SENSITIVITY,-MIN_TAIL_PITCH,MAX_TAIL_PITCH);
+        var p=localPose();p.setTarget(limitTargetStep(p.targetYaw,yaw),limitTargetStep(p.targetPitch,pitch),true);
+        boolean over=!safeZone(x,y);if(over!=overstretchActive){overstretchActive=over;sendPose(true,false);}
     }
-
-    public static void updatePointer(double mouseX, double mouseY) {
-        Minecraft mc = Minecraft.getInstance();
-        if (!active || mc.level == null || !(mc.level.getEntity(maidId) instanceof EntityMaid maid)) {
-            pointerOverTail = false;
-            return;
-        }
-        RayHit hit = projectPointer(mc, maid, mouseX, mouseY);
-        pointerInSafeZone = isInsideSafeZone(mc, mouseX, mouseY);
-        pointerOverTail = hit != null && hit.inside();
-        if (hit == null) return;
-        candidateYaw = hit.yaw();
-        candidatePitch = hit.pitch();
-        if (grabbed) {
-            SmoothedPose pose = POSES.computeIfAbsent(maidId, ignored -> new SmoothedPose());
-            candidateYaw = limitTargetStep(pose.targetYaw, candidateYaw);
-            candidatePitch = limitTargetStep(pose.targetPitch, candidatePitch);
-            pose.setTarget(candidateYaw, candidatePitch, true);
-            boolean newOverstretch = !pointerInSafeZone;
-            if (newOverstretch != overstretchActive) {
-                overstretchActive = newOverstretch;
-                sendPose(true);
-            }
-        }
+    private static Vec3 onPlane(double x,double y,Vec3 center){
+        var camera=Minecraft.getInstance().gameRenderer.getMainCamera();var v=camera.getLookVector();
+        Vec3 normal=new Vec3(v.x,v.y,v.z),ray=TailHitProjection.ray(x,y);
+        double dot=ray.dot(normal);if(Math.abs(dot)<1e-5)return null;
+        double d=center.subtract(camera.getPosition()).dot(normal)/dot;
+        return d>0&&d<12?camera.getPosition().add(ray.scale(d)):null;
     }
+    private static boolean safeZone(double x,double y){var w=Minecraft.getInstance().getWindow();
+        return Math.abs(x/w.getGuiScaledWidth()-.5)<=SAFE_ZONE_WIDTH*.5&&Math.abs(y/w.getGuiScaledHeight()-.5)<=SAFE_ZONE_HEIGHT*.5;}
+    private static float softLimit(float value,float negative,float positive){if(!Float.isFinite(value))return 0;float limit=value<0?negative:positive;return limit*(float)Math.tanh(value/limit);}
+    private static float limitTargetStep(float current,float value){return Float.isFinite(value)?Mth.clamp(value,current-MAX_TARGET_CHANGE_PER_UPDATE,current+MAX_TARGET_CHANGE_PER_UPDATE):current;}
 
-    private static RayHit projectPointer(Minecraft mc, EntityMaid maid, double mouseX, double mouseY) {
-        Camera camera = mc.gameRenderer.getMainCamera();
-        Vector3f lookVector = camera.getLookVector();
-        Vector3f upVector = camera.getUpVector();
-        Vector3f leftVector = camera.getLeftVector();
-        Vec3 forwardCamera = new Vec3(lookVector.x(), lookVector.y(), lookVector.z()).normalize();
-        Vec3 upCamera = new Vec3(upVector.x(), upVector.y(), upVector.z()).normalize();
-        Vec3 rightCamera = new Vec3(-leftVector.x(), -leftVector.y(), -leftVector.z()).normalize();
-        double ndcX = mouseX / Math.max(1.0, mc.getWindow().getGuiScaledWidth()) * 2.0 - 1.0;
-        double ndcY = 1.0 - mouseY / Math.max(1.0, mc.getWindow().getGuiScaledHeight()) * 2.0;
-        double tan = Math.tan(Math.toRadians(mc.options.fov().get()) * 0.5);
-        double aspect = (double) mc.getWindow().getGuiScaledWidth()
-                / Math.max(1.0, mc.getWindow().getGuiScaledHeight());
-        Vec3 rayDirection = forwardCamera.add(rightCamera.scale(ndcX * tan * aspect))
-                .add(upCamera.scale(ndcY * tan)).normalize();
-
-        Vec3 maidForward = Vec3.directionFromRotation(0, maid.getYRot()).normalize();
-        Vec3 rear = maidForward.scale(-1);
-        Vec3 maidRight = new Vec3(maidForward.z, 0, -maidForward.x).normalize();
-        Vec3 planeCenter = maid.position().add(rear.scale(0.42)).add(0, maid.getBbHeight() * 0.58, 0);
-        Vec3 origin = camera.getPosition();
-        double denominator = rayDirection.dot(forwardCamera);
-        if (Math.abs(denominator) < 1.0e-5) return null;
-        double distance = planeCenter.subtract(origin).dot(forwardCamera) / denominator;
-        if (distance <= 0 || distance > 12.0) return null;
-        Vec3 worldTarget = origin.add(rayDirection.scale(distance));
-        Vec3 planeOffset = worldTarget.subtract(planeCenter);
-        double side = planeOffset.dot(maidRight);
-        double vertical = planeOffset.y;
-        boolean inside = Math.abs(side) <= 0.58 && Math.abs(vertical) <= 0.55;
-
-        Vec3 tailBase = planeCenter.subtract(rear.scale(0.68));
-        Vec3 localTarget = worldTarget.subtract(tailBase);
-        double localSide = localTarget.dot(maidRight);
-        double localRear = Math.max(0.22, localTarget.dot(rear));
-        float rawYaw = (float) Math.atan2(localSide, localRear) * TAIL_DRAG_SENSITIVITY;
-        float rawPitch = (float) Math.atan2(localTarget.y,
-                Math.sqrt(localSide * localSide + localRear * localRear)) * TAIL_DRAG_SENSITIVITY;
-        float yaw = softLimit(rawYaw, MAX_TAIL_YAW, MAX_TAIL_YAW);
-        float pitch = softLimit(rawPitch, -MIN_TAIL_PITCH, MAX_TAIL_PITCH);
-        return new RayHit(inside, yaw, pitch);
+    public static void beginSniff(){
+        if(!active||isSniffing())return;
+        var target=TailHitProjection.find(selected);
+        if(target==null){var mc=Minecraft.getInstance();if(mc.player!=null)mc.player.displayClientMessage(Component.translatable("message.moreanimation.select_tail"),true);return;}
+        if(!TailSniffCamera.begin(target))return;
+        grabbed=false;overstretchActive=false;dragCenter=dragOrigin=null;
+        var p=localPose();p.frozen=true;Arrays.fill(p.velocityYaw,0);Arrays.fill(p.velocityPitch,0);
+        sendPose(false,true);
     }
-
-    private static boolean isInsideSafeZone(Minecraft mc, double mouseX, double mouseY) {
-        double width = Math.max(1.0, mc.getWindow().getGuiScaledWidth());
-        double height = Math.max(1.0, mc.getWindow().getGuiScaledHeight());
-        double normalizedX = mouseX / width;
-        double normalizedY = mouseY / height;
-        return Math.abs(normalizedX - 0.5) <= SAFE_ZONE_WIDTH * 0.5
-                && Math.abs(normalizedY - 0.5) <= SAFE_ZONE_HEIGHT * 0.5;
+    public static void sniffFinished(){
+        if(!active)return;grabbed=false;overstretchActive=false;dragCenter=dragOrigin=null;
+        var p=localPose();p.frozen=false;p.setTarget(0,0,false);sendPose(false,false);
     }
-
-    private static float softLimit(float value, float negativeLimit, float positiveLimit) {
-        if (!Float.isFinite(value)) return 0;
-        float limit = value < 0 ? negativeLimit : positiveLimit;
-        return limit * (float) Math.tanh(value / limit);
+    private static void sendPose(boolean holding,boolean frozen){
+        if(maidId<0||selected.isEmpty())return;var p=localPose();
+        lastSentYaw=holding||frozen?p.targetYaw:0;lastSentPitch=holding||frozen?p.targetPitch:0;
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new TailPoseUpdatePacket(maidId,selected,holding,frozen,holding&&overstretchActive,lastSentYaw,lastSentPitch));
     }
-
-    private static float limitTargetStep(float current, float requested) {
-        if (!Float.isFinite(requested)) return current;
-        return Mth.clamp(requested, current - MAX_TARGET_CHANGE_PER_UPDATE,
-                current + MAX_TARGET_CHANGE_PER_UPDATE);
+    public static void receiveRemotePose(int id,boolean interaction,boolean sitting,String tail,boolean holding,boolean frozen,float yaw,float pitch){
+        checkLevel();
+        if(active&&id==maidId)return;
+        if(!interaction){INTERACTIONS.remove(id);POSES.remove(id);return;}
+        INTERACTIONS.put(id,sitting);if(tail.isEmpty())return;
+        var tails=POSES.get(id);
+        if(tails!=null&&!tails.containsKey(tail)&&tails.size()>=128)return;
+        var p=pose(id,tail);p.frozen=frozen;p.setTarget(holding||frozen?yaw:0,holding||frozen?pitch:0,holding);
     }
-
-    private static void syncLocalPose() {
-        if (!grabbed || ++syncTicker < 3) return;
-        syncTicker = 0;
-        SmoothedPose pose = POSES.get(maidId);
-        if (pose == null) return;
-        if (Math.abs(pose.targetYaw - lastSentYaw) > 0.01f
-                || Math.abs(pose.targetPitch - lastSentPitch) > 0.01f
-                || overstretchActive != lastSentOverstretch) sendPose(true);
-    }
-
-    private static void sendPose(boolean holding) {
-        if (maidId < 0) return;
-        SmoothedPose pose = POSES.get(maidId);
-        float yaw = holding && pose != null ? pose.targetYaw : 0;
-        float pitch = holding && pose != null ? pose.targetPitch : 0;
-        lastSentYaw = yaw;
-        lastSentPitch = pitch;
-        lastSentOverstretch = holding && overstretchActive;
-        PacketDistributor.sendToServer(new TailPoseUpdatePacket(
-                maidId, holding, lastSentOverstretch, yaw, pitch));
-    }
-
-    public static void receiveRemotePose(int entityId, boolean interactionActive, boolean useSittingBase,
-                                         boolean holding, float yaw, float pitch) {
-        if (active && entityId == maidId) return;
-        SmoothedPose pose = POSES.computeIfAbsent(entityId, ignored -> new SmoothedPose());
-        pose.setInteraction(interactionActive, useSittingBase);
-        pose.setTarget(holding ? yaw : 0, holding ? pitch : 0, holding);
-    }
-
-    public static boolean isInteractionActive(int entityId) {
-        SmoothedPose pose = POSES.get(entityId);
-        return (active && entityId == maidId) || pose != null && pose.interactionActive;
-    }
-
-    public static boolean usesSittingBase(int entityId) {
-        if (active && entityId == maidId) return sittingBase;
-        SmoothedPose pose = POSES.get(entityId);
-        return pose != null && pose.interactionActive && pose.sittingBase;
-    }
-
-    public static PoseSnapshot poseFor(int entityId) {
-        SmoothedPose pose = POSES.get(entityId);
-        if (pose == null || pose.isEffectivelyZero()) return null;
-        return pose.snapshot();
-    }
-
+    public static boolean isInteractionActive(int id){return INTERACTIONS.containsKey(id);}
+    public static boolean usesSittingBase(int id){return Boolean.TRUE.equals(INTERACTIONS.get(id));}
+    public static boolean hasPose(int id){return POSES.containsKey(id)&&!POSES.get(id).isEmpty();}
+    public static PoseSnapshot poseFor(int id,String tail){var p=POSES.getOrDefault(id,Map.of()).get(tail);return p==null||p.isEffectivelyZero()?null:p.snapshot();}
     @SuppressWarnings("rawtypes")
-    public static void applyGecko(AnimationProcessor processor, EntityMaid maid) {
-        boolean exclusive = isInteractionActive(maid.getId());
-        PoseSnapshot pose = poseFor(maid.getId());
-        if (!exclusive && pose == null) return;
-        applyGeckoBone(processor, "Tail", pose, 1, exclusive);
-        for (int logical = 2; logical <= 63; logical++) {
-            applyGeckoBone(processor, "Tail" + logical, pose, logical, exclusive);
-        }
-        for (int glow = 64; glow <= 126; glow++) {
-            applyGeckoBone(processor, "ysmGlowTail" + glow, pose, glow - 63, exclusive);
+    public static void applyGecko(AnimationProcessor processor,EntityMaid maid,AnimatedGeoModel model){
+        boolean exclusive=isInteractionActive(maid.getId());if(model==null||!exclusive&&!hasPose(maid.getId()))return;
+        for(var entry:GeckoTailAnchors.layout(model).bindings().entrySet()){
+            var bone=processor.getBone(entry.getKey());if(bone==null)continue;
+            if(exclusive){var initial=bone.getInitialSnapshot();bone.setRotationX(initial.rotationValueX);bone.setRotationY(initial.rotationValueY);bone.setRotationZ(initial.rotationValueZ);}
+            var binding=entry.getValue();var p=poseFor(maid.getId(),binding.tailId());if(p==null)continue;
+            float yaw=p.yawForSegment(binding.segment()),pitch=p.pitchForSegment(binding.segment());
+            bone.setRotationX(bone.getRotationX()-pitch);bone.setRotationY(bone.getRotationY()-yaw);bone.setRotationZ(bone.getRotationZ()-yaw*.08f);
         }
     }
 
-    @SuppressWarnings("rawtypes")
-    private static void applyGeckoBone(AnimationProcessor processor, String name,
-                                       PoseSnapshot pose, int logicalIndex, boolean resetBase) {
-        IBone bone = processor.getBone(name);
-        if (bone == null) return;
-        if (resetBase) {
-            var initial = bone.getInitialSnapshot();
-            bone.setRotationX(initial.rotationValueX);
-            bone.setRotationY(initial.rotationValueY);
-            bone.setRotationZ(initial.rotationValueZ);
-        }
-        if (pose == null) return;
-        float yaw = pose.yawFor(logicalIndex);
-        float pitch = pose.pitchFor(logicalIndex);
-                                                                                  
-                                                                                       
-        bone.setRotationX(bone.getRotationX() - pitch);
-        bone.setRotationY(bone.getRotationY() - yaw);
-        bone.setRotationZ(bone.getRotationZ() - yaw * 0.08f);
+    public static int segmentForBone(String name){
+        if(name==null)return -1;String n=name.toLowerCase(Locale.ROOT);
+        if(n.matches("body_tail[0-9]*"))n=n.substring(5);
+        try {int i=n.equals("tail")?1:n.matches("tail[0-9]+")?Integer.parseInt(n.substring(4)):
+                n.matches("ysmglowtail[0-9]+")?Integer.parseInt(n.substring(11))-63:-1;return i>0?(i-1)%7:-1;}
+        catch(NumberFormatException e){return -1;}
     }
-
-    public static float weightForBone(String boneName) {
-        int segment = segmentForBone(boneName);
-        return segment >= 0 ? CHAIN_WEIGHTS[segment] : 0;
+    public static float weightForBone(String name){int i=segmentForBone(name);return i<0?0:CHAIN_WEIGHTS[i];}
+    public static boolean isPointerOverTail(){return pointerOverTail;}
+    public static boolean isGrabbed(){return grabbed;}
+    public static boolean isOverstretchActive(){return overstretchActive;}
+    public static long interactionStartTime(){return interactionStartTime;}
+    public record PoseSnapshot(float[] yaw,float[] pitch){
+        public float yawForSegment(int segment){return yaw[Math.min(segment,yaw.length-1)];}
+        public float pitchForSegment(int segment){return pitch[Math.min(segment,pitch.length-1)];}
     }
-
-    public static int segmentForBone(String boneName) {
-        if (boneName == null) return -1;
-        String lower = boneName.toLowerCase(java.util.Locale.ROOT);
-        int logical;
-        if ("tail".equals(lower)) {
-            logical = 1;
-        } else if (lower.startsWith("tail")) {
-            logical = parsePositive(lower.substring(4));
-        } else if (lower.startsWith("ysmglowtail")) {
-            int glow = parsePositive(lower.substring(11));
-            logical = glow >= 64 ? glow - 63 : -1;
-        } else {
-            return -1;
-        }
-        return logical > 0 ? Math.floorMod(logical - 1, CHAIN_WEIGHTS.length) : -1;
-    }
-
-    private static int parsePositive(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {
-            return -1;
-        }
-    }
-
-    private static float weightForLogicalIndex(int logicalIndex) {
-        return CHAIN_WEIGHTS[Math.floorMod(logicalIndex - 1, CHAIN_WEIGHTS.length)];
-    }
-
-    public static boolean isPointerOverTail() {
-        return pointerOverTail;
-    }
-
-    public static boolean isGrabbed() {
-        return grabbed;
-    }
-
-    public static boolean isOverstretchActive() {
-        return overstretchActive;
-    }
-
-    public static long interactionStartTime() {
-        return interactionStartTime;
-    }
-
-    public record PoseSnapshot(float[] yaw, float[] pitch) {
-        public float yawFor(int logicalIndex) {
-            return yaw[Math.floorMod(logicalIndex - 1, yaw.length)];
-        }
-
-        public float pitchFor(int logicalIndex) {
-            return pitch[Math.floorMod(logicalIndex - 1, pitch.length)];
-        }
-
-        public float yawForSegment(int segment) {
-            return yaw[segment];
-        }
-
-        public float pitchForSegment(int segment) {
-            return pitch[segment];
-        }
-    }
-
-    private record RayHit(boolean inside, float yaw, float pitch) {
-    }
-
     private static final class SmoothedPose {
         private float targetYaw;
         private float targetPitch;
@@ -465,6 +217,7 @@ public final class TailInteractionState {
         private final float[] velocityYaw = new float[CHAIN_WEIGHTS.length];
         private final float[] velocityPitch = new float[CHAIN_WEIGHTS.length];
         private boolean holding;
+        private boolean frozen;
         private boolean interactionActive;
         private boolean sittingBase;
 
@@ -481,6 +234,7 @@ public final class TailInteractionState {
         }
 
         private void tick() {
+            if (frozen) return;
             for (int i = 0; i < CHAIN_WEIGHTS.length; i++) {
                 float weightedYaw;
                 float weightedPitch;
@@ -525,7 +279,7 @@ public final class TailInteractionState {
         }
 
         private boolean canDiscard() {
-            return !interactionActive && !holding && isEffectivelyZero();
+            return !frozen && !interactionActive && !holding && isEffectivelyZero();
         }
 
         private PoseSnapshot snapshot() {

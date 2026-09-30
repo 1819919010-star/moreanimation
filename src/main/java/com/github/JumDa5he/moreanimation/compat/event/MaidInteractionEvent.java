@@ -274,6 +274,19 @@ public class MaidInteractionEvent {
                 || isMovementControlled(maid) || target == null || !target.isAlive()
                 || target.level() != level || target == maid
                 || target instanceof EntityMaid other && isMovementControlled(other)) return false;
+        if (target instanceof EntityMaid other && (type.equals("pet_maid") || type.equals("hug_maid"))) {
+            if (MaidAnimationData.isFaceInteractionActive(maid) || MaidAnimationData.isTailInteractionActive(maid)
+                    || MaidAnimationData.isFaceInteractionActive(other) || MaidAnimationData.isTailInteractionActive(other)
+                    || maid.isSleeping() || other.isSleeping()
+                    || !com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)
+                    || !com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(other)) return false;
+            if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.acquire(maid,
+                    com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.Kind.MAID_PAIR)) return false;
+            if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.acquire(other,
+                    com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.Kind.MAID_PAIR)) {
+                com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.release(maid.getUUID()); return false;
+            }
+        }
         Session session = new Session(maid.getUUID(), type, target.getUUID(), level.dimension(), level.getGameTime());
         SESSIONS.put(maid.getUUID(), session);
         beginControl(maid);
@@ -308,11 +321,16 @@ public class MaidInteractionEvent {
 
     public static boolean isMovementControlled(EntityMaid maid) {
         UUID id = maid.getUUID();
-        if (SESSIONS.containsKey(id)) return true;
+        if (SESSIONS.containsKey(id) || StandingHandEvent.controls(maid)) return true;
         for (Session session : SESSIONS.values()) {
             if (session.target.equals(id)) return true;
         }
         return false;
+    }
+
+    public static boolean isMaidPairParticipant(EntityMaid maid) {
+        return SESSIONS.values().stream().anyMatch(s -> (s.type.equals("pet_maid") || s.type.equals("hug_maid"))
+                && s.dimension.equals(maid.level().dimension()) && (s.maid.equals(maid.getUUID()) || s.target.equals(maid.getUUID())));
     }
 
     private static void tickSessions(ServerLevel level) {
@@ -326,6 +344,11 @@ public class MaidInteractionEvent {
                 finish(selfEntity instanceof EntityMaid m ? m : null, target);
                 SESSIONS.remove(entry.getKey(), session);
                 continue;
+            }
+            if ((session.type.equals("pet_maid") || session.type.equals("hug_maid"))
+                    && (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)
+                    || target instanceof EntityMaid other && !com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(other))) {
+                finish(maid, target); SESSIONS.remove(entry.getKey(), session); continue;
             }
             if (session.started < 0) {
                 if (now - session.created > 240) {
@@ -441,6 +464,8 @@ public class MaidInteractionEvent {
     }
 
     private static void finish(EntityMaid maid, Entity target) {
+        if (maid != null && isMaidPairParticipant(maid)) com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.release(maid.getUUID());
+        if (target instanceof EntityMaid other && isMaidPairParticipant(other)) com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.release(other.getUUID());
         if (maid != null) {
             stopInteractionAction(maid);
             endControl(maid);

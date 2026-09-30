@@ -12,5 +12,7 @@ public final class ModSounds {
             DeferredRegister.create(Registries.SOUND_EVENT, MoreAnimation.MOD_ID);
     public static final DeferredHolder<SoundEvent, SoundEvent> SLAP = SOUNDS.register("slap", () ->
             SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "slap")));
+    public static final DeferredHolder<SoundEvent, SoundEvent> TAIL_SNIFF = SOUNDS.register("tail_sniff", () ->
+            SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "tail_sniff")));
     private ModSounds() {}
 }

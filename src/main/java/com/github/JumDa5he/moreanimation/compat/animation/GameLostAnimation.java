@@ -131,7 +131,8 @@ public class GameLostAnimation {
                 ILoopType.EDefaultLoopTypes.LOOP,
                 Priority.HIGHEST,
                 (maid, animEvent) -> {
-                    EntityMaid entity = (EntityMaid) maid.asEntity();
+                    EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                     UUID uuid = entity.getUUID();
                     if (!canClaim(entity, "come")) return false;
                     // 物品触发：睡觉且主人主手持末地烛时循环播放
@@ -157,7 +158,8 @@ public class GameLostAnimation {
                 ILoopType.EDefaultLoopTypes.LOOP,
                 Priority.HIGHEST,
                 (maid, animEvent) -> {
-                    EntityMaid entity = (EntityMaid) maid.asEntity();
+                    EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                     UUID uuid = entity.getUUID();
                     if (!canClaim(entity, "come2")) return false;
                     // 物品触发：坐着且主人主手持末地烛时循环播放
@@ -184,7 +186,8 @@ public class GameLostAnimation {
                 ILoopType.EDefaultLoopTypes.LOOP,
                 Priority.HIGHEST,
                 (maid, animEvent) -> {
-                    EntityMaid entity = (EntityMaid) maid.asEntity();
+                    EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                     UUID uuid = entity.getUUID();
                     if (!canClaim(entity, "weidu")) return false;
                     if (!entity.isMaidInSittingPose()) {
@@ -217,7 +220,8 @@ public class GameLostAnimation {
                 ILoopType.EDefaultLoopTypes.LOOP,
                 Priority.HIGHEST,
                 (maid, animEvent) -> {
-                    EntityMaid entity = (EntityMaid) maid.asEntity();
+                    EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                     UUID uuid = entity.getUUID();
                     if (!canClaim(entity, "ha")) return false;
                     if (!entity.isMaidInSittingPose()) {
@@ -241,7 +245,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.LOOP,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "morebeg")) return false;
                         float health = entity.getHealth();
@@ -261,7 +266,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.LOOP,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "sleep2")) return false;
                         // 物品触发：主人主手持白色羊毛时循环播放
@@ -286,7 +292,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "tastetail")) return false;
                         boolean sitting = entity.isMaidInSittingPose();
@@ -333,7 +340,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.LOOP,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "eattail")) return false;
                         boolean sitting = entity.isMaidInSittingPose();
@@ -373,7 +381,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.LOOP,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "catchbyhook")) return false;
                         if (entity.level().getEntitiesOfClass(FishingHook.class,
@@ -393,7 +402,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "hurt")) return false;
                         Long start = hurtStartTick.get(uuid);
@@ -426,7 +436,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "kowtow")) return false;
                         if (entity.getPersistentData().getBoolean("moreanimation_kowtow")) {
@@ -452,7 +463,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.LOOP,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "drowning")) return false;
                         if (entity.isInWater() && entity.getAirSupply() <= 0) {
@@ -470,7 +482,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.LOOP,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "situp")) return false;
                         // 随机调度：睡觉动作池
@@ -489,7 +502,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "pray")) return false;
                         if (entity.getPersistentData().getBoolean("moreanimation_pray")) {
@@ -507,7 +521,8 @@ public class GameLostAnimation {
                     ILoopType.EDefaultLoopTypes.PLAY_ONCE,
                     Priority.HIGHEST,
                     (maid, animEvent) -> {
-                        EntityMaid entity = (EntityMaid) maid.asEntity();
+                        EntityMaid entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(animEvent.getAnimatableEntity());
+                    if (entity == null) return false;
                         UUID uuid = entity.getUUID();
                         if (!canClaim(entity, "watchtombstone")) return false;
                         Long start = tombstoneStartTick.get(uuid);
@@ -567,6 +582,7 @@ public class GameLostAnimation {
 
                                                                                                 
     public static void serverTick(EntityMaid maid) {
+        if (com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.controls(maid)) return;
         if (maid.level().isClientSide()) return;
         JadeFootEvent.serverTick(maid);
         if (!maid.isAlive()) return;

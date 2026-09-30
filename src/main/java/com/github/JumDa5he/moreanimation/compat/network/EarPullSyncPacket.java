@@ -8,6 +8,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
@@ -26,8 +27,10 @@ public record EarPullSyncPacket(int entityId, boolean pulling, int side) impleme
 
     public static void handle(EarPullSyncPacket message, IPayloadContext context) {
         context.enqueueWork(() -> {
-            Entity entity = Minecraft.getInstance().level.getEntity(message.entityId());
-            if (entity != null) {
+            var level = Minecraft.getInstance().level;
+            if (level == null) return;
+            Entity entity = level.getEntity(message.entityId());
+            if (entity instanceof EntityMaid) {
                 entity.getPersistentData().putBoolean(TAG_EARPULL, message.pulling());
                 entity.getPersistentData().putInt(TAG_EARPULL_SIDE, message.side());
             }

@@ -17,6 +17,10 @@ public abstract class GeckoFaceAnchorMixin {
     @Shadow(remap=false) protected AnimatableEntity currentAnimatable;
     @Inject(method="renderEarly(Lnet/minecraft/world/entity/LivingEntity;Lcom/mojang/blaze3d/vertex/PoseStack;FLnet/minecraft/client/renderer/MultiBufferSource;Lcom/mojang/blaze3d/vertex/VertexConsumer;IIFFFF)V",at=@At("RETURN"),remap=false)
     private void moreanimation$captureFace(LivingEntity entity,PoseStack stack,float partialTick,MultiBufferSource buffers,VertexConsumer buffer,int light,int overlay,float r,float g,float b,float a,CallbackInfo ci){
-        if(entity instanceof EntityMaid maid&&currentAnimatable!=null)GeckoFaceAnchors.capture(maid.getId(),currentAnimatable.getCurrentModel(),stack);
+        if(entity instanceof EntityMaid maid&&currentAnimatable!=null) {
+            GeckoFaceAnchors.capture(maid.getId(),currentAnimatable.getCurrentModel(),stack);
+            com.github.JumDa5he.moreanimation.client.GeckoTailAnchors.capture(maid.getId(),currentAnimatable.getCurrentModel(),currentAnimatable.getTextureLocation(),stack);
+            com.github.JumDa5he.moreanimation.client.StandingHandPose.gecko(maid,currentAnimatable.getCurrentModel(),stack,partialTick);
+        }
     }
 }

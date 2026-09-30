@@ -28,6 +28,7 @@ public class GeckoModelLoaderMixin {
     @Inject(method = "reload", at = @At("HEAD"), remap = false)
     private static void moreanimation$clearAnimationCache(CallbackInfo ci) {
         moreanimation$animations = null;
+        com.github.JumDa5he.moreanimation.client.StandingHandBoneMask.reload();
     }
 
     @Inject(method = "registerMaidAnimations", at = @At("HEAD"), remap = false)
@@ -51,6 +52,7 @@ public class GeckoModelLoaderMixin {
         AnimationFile loaded = new AnimationFile();
         if (!moreanimation$merge(MOREANIMATION_ACTIONS, loaded)) return null;
         moreanimation$merge(MOREANIMATION_COMPAT, loaded);
+        moreanimation$merge(ResourceLocation.fromNamespaceAndPath(MoreAnimation.MOD_ID, "animation/hold_hand.animation.json"), loaded);
         moreanimation$animations = loaded;
         MOREANIMATION_LOGGER.info("Loaded {} shared maid animations", loaded.animations().size());
         return loaded;

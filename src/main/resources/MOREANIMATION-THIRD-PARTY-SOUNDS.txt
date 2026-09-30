@@ -1,0 +1,8 @@
+Sniff Long
+Author: Mike Koenig
+Source: https://soundbible.com/956-Sniff-Long.html
+License: Creative Commons Attribution 3.0 (CC BY 3.0)
+License URL: https://creativecommons.org/licenses/by/3.0/
+Resource: assets/moreanimation/sounds/tail_sniff.ogg
+Processing: full supplied WAV converted to OGG/Vorbis, quality 6, original 44100 Hz stereo.
+No trimming or speed changes to the asset (5.673515 seconds). The interaction stops playback after the first 2 seconds at the user's request.

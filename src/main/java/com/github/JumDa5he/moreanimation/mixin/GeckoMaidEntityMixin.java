@@ -14,10 +14,20 @@ public abstract class GeckoMaidEntityMixin {
     @Inject(method = "updateHead", at = @At("HEAD"), cancellable = true, remap = false)
     private void moreanimation$keepBowHeadExclusive(EntityModelData data, AnimatedGeoModel currentModel,
                                                      boolean update, CallbackInfo ci) {
-        var maid = ((GeckoMaidEntity<?>) (Object) this).getMaid();
-        if (maid != null && maid.asEntity() instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid entity
-                && (MaidAnimationData.isActive(entity, "maid_bow")
-                || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.isSlap(entity))) {
+        var entity = com.github.JumDa5he.moreanimation.client.ActualMaid.from(this);
+        if (entity == null) return;
+        if ((MaidAnimationData.isActive(entity, "beg2") || MaidAnimationData.isActive(entity, "sit2"))
+                && currentModel.head() != null
+                && com.github.JumDa5he.moreanimation.client.BegBoneMask.loaded((GeckoMaidEntity<?>) (Object) this,
+                MaidAnimationData.activeAction(entity))
+                .rotations().contains(currentModel.head().getName())) {
+            // 有头部关键帧时，禁止动画处理之后再次叠加看向玩家的旋转。
+            ci.cancel();
+            return;
+        }
+        if ((MaidAnimationData.isActive(entity, "maid_bow")
+                || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.isSlap(entity)
+                || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(MaidAnimationData.activeAction(entity)))) {
             ci.cancel();
         }
     }

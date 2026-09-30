@@ -65,11 +65,17 @@ public record TerminalControlPacket(int maidId, String command, String category,
                                     MaidAnimationData.formMode(maid)));
                     sendData(player, maid);
                 }
-                case "play" -> MaidAnimationData.start(maid, packet.value(), MaidAnimationData.duration(packet.value()),
+                case "play" -> {
+                    if (packet.value().startsWith("hand_hold_") || packet.value().startsWith("player_hand_hold_")) return;
+                    MaidAnimationData.start(maid, packet.value(), MaidAnimationData.duration(packet.value()),
                         "injured_kneel".equals(packet.value())
                                 ? MaidAnimationData.PRIORITY_INJURED : MaidAnimationData.PRIORITY_MANUAL,
                         "injured_kneel".equals(packet.value()));
-                case "interaction" -> MaidInteractionEvent.requestInteraction(maid, packet.value());
+                }
+                case "interaction" -> {
+                    if ("hand_hold".equals(packet.value())) com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.begin(player, maid);
+                    else MaidInteractionEvent.requestInteraction(maid, packet.value());
+                }
                 default -> { }
             }
         });

@@ -6,9 +6,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public class MoreAnimationNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1.0.0");
+        PayloadRegistrar registrar = event.registrar("2.0.0");
+        registrar.playToServer(StandingHandCancelPacket.TYPE, StandingHandCancelPacket.STREAM_CODEC, StandingHandCancelPacket::handle);
 
         if (FMLEnvironment.dist.isClient()) {
+            registrar.playToClient(StandingHandStatePacket.TYPE, StandingHandStatePacket.STREAM_CODEC, StandingHandStatePacket::handle);
+            registrar.playToClient(CuteProtectionPacket.TYPE, CuteProtectionPacket.STREAM_CODEC, CuteProtectionPacket::handle);
             registrar.playToClient(HuggingSyncPacket.TYPE, HuggingSyncPacket.STREAM_CODEC, HuggingSyncPacket::handle);
             registrar.playToClient(TailPullSyncPacket.TYPE, TailPullSyncPacket.STREAM_CODEC, TailPullSyncPacket::handle);
             registrar.playToClient(KowtowSyncPacket.TYPE, KowtowSyncPacket.STREAM_CODEC, KowtowSyncPacket::handle);
@@ -32,6 +35,8 @@ public class MoreAnimationNetwork {
             registrar.playToClient(SlapFeedbackPacket.TYPE, SlapFeedbackPacket.STREAM_CODEC,
                     SlapFeedbackPacket::handle);
         } else {
+            registrar.playToClient(StandingHandStatePacket.TYPE, StandingHandStatePacket.STREAM_CODEC, (pkt, ctx) -> { });
+            registrar.playToClient(CuteProtectionPacket.TYPE, CuteProtectionPacket.STREAM_CODEC, (pkt, ctx) -> { });
             registrar.playToClient(HuggingSyncPacket.TYPE, HuggingSyncPacket.STREAM_CODEC, (pkt, ctx) -> {
             });
             registrar.playToClient(TailPullSyncPacket.TYPE, TailPullSyncPacket.STREAM_CODEC, (pkt, ctx) -> {

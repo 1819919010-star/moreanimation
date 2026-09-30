@@ -94,7 +94,7 @@ public class PrayEvent {
             return;
         }
         for (EntityMaid maid : loadedMaids(level)) {
-            if (!maid.isAlive() || PENDING_ANIMS.containsKey(maid.getUUID())) {
+            if (!maid.isAlive() || StandingHandEvent.controls(maid) || PENDING_ANIMS.containsKey(maid.getUUID())) {
                 continue;
             }
             if (isCooldown(maid, now)) {

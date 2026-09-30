@@ -28,7 +28,9 @@ public abstract class YsmRendererMixin {
     private void moreanimation$restore(@Coerce Object animatable, ResourceLocation texture,
                                        float entityYaw, float partialTick, PoseStack poseStack,
                                        MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.restore(animatable);
         YsmAnimationBridge.before(animatable);
+        com.github.JumDa5he.moreanimation.client.CuteYsmOrder.before(animatable);
     }
 
     @Inject(method = RENDER_METHOD,
@@ -36,7 +38,25 @@ public abstract class YsmRendererMixin {
     private void moreanimation$apply(@Coerce Object animatable, ResourceLocation texture,
                                      float entityYaw, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
+        com.github.JumDa5he.moreanimation.client.CuteYsmOrder.after(animatable, partialTick);
         YsmAnimationBridge.after(animatable, partialTick);
-        YsmFaceAnchors.capture(animatable, poseStack);
+    }
+
+    @Inject(method = RENDER_METHOD, at = @At(value = "INVOKE", target =
+            "Lcom/elfmcys/yesstevemodel/OO0OOoo0ooooOoO0O0o00Ooo;oOo0OO0O0o000OO0O000oo0o(Lcom/elfmcys/yesstevemodel/o0ooO0ooO00oo0o00Oo00000;Lcom/elfmcys/yesstevemodel/OoO0oo0o0o0oOoo0oOOO0Ooo;FLnet/minecraft/client/renderer/RenderType;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILcom/mojang/blaze3d/vertex/VertexConsumer;IIFFFF)V"))
+    private void moreanimation$interactionPose(@Coerce Object animatable, ResourceLocation texture,
+                                              float yaw, float partialTick, PoseStack stack,
+                                              MultiBufferSource buffers, int light, CallbackInfo ci) {
+        // 此时 1.21 渲染器已经完成实体朝向与模型缩放，坐标可用于骨骼定位。
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.apply(animatable, stack, partialTick);
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmTailAnchors.capture(animatable, texture, stack);
+        YsmFaceAnchors.capture(animatable, stack);
+    }
+
+    @Inject(method = RENDER_METHOD, at = @At("RETURN"))
+    private void moreanimation$restorePlayerPose(@Coerce Object animatable, ResourceLocation texture,
+                                                float yaw, float partialTick, PoseStack stack,
+                                                MultiBufferSource buffers, int light, CallbackInfo ci) {
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.restore(animatable);
     }
 }

@@ -70,11 +70,16 @@ public final class FaceInteractionEvent {
             player.displayClientMessage(Component.translatable("message.moreanimation.face_not_yours"), true);
             return;
         }
-        if (!player.isAlive() || player.isSpectator() || !maid.isAlive() || maid.isRemoved()
+        if (StandingHandEvent.controls(maid) || StandingHandEvent.playerBusy(player.getUUID())
+                || !player.isAlive() || player.isSpectator() || !maid.isAlive() || maid.isRemoved()
                 || player.level() != maid.level() || player.distanceToSqr(maid) > START_DISTANCE_SQR
                 || BY_MAID.containsKey(maid.getUUID()) || MaidAnimationData.isTailInteractionActive(maid)) return;
 
+        if (MaidInteractionEvent.isMovementControlled(maid) || maid.isSleeping()
+                || !com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)) return;
         stop(player);
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.acquire(maid,
+                com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.Kind.FACE)) return;
         Vec3 playerAnchor = player.position();
         float playerYaw = player.getYRot();
         float originalPlayerPitch = player.getXRot();
@@ -104,6 +109,7 @@ public final class FaceInteractionEvent {
         Session session = BY_PLAYER.remove(player.getUUID());
         if (session == null) return;
         BY_MAID.remove(session.maidId());
+        com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.release(session.maidId());
         EntityMaid maid = knownMaid != null ? knownMaid : resolveMaid(player, session);
         int maidEntityId = maid != null ? maid.getId() : session.maidEntityId();
         if (maid != null) {
@@ -291,6 +297,7 @@ public final class FaceInteractionEvent {
 
     private static boolean valid(ServerPlayer player, EntityMaid maid, Session session) {
         return player.isAlive() && !player.isSpectator() && maid.isAlive() && !maid.isRemoved()
+                && com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)
                 && player.level().dimension().equals(session.dimension()) && player.level() == maid.level()
                 && player.distanceToSqr(maid) <= MAX_DISTANCE_SQR && isOwner(maid, player);
     }

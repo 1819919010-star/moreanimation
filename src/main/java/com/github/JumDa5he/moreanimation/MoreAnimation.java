@@ -25,6 +25,7 @@ public class MoreAnimation {
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, MoreAnimationConfig.SPEC);
 
+
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModItems.ITEMS.register(modBus);
         com.github.JumDa5he.moreanimation.core.ModSounds.SOUNDS.register(modBus);

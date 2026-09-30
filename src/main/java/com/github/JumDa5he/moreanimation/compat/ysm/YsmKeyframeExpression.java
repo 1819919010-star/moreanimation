@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.ysm;
 
-/** Read-only subset used by our exported clips. No shared Gecko Molang variables are modified. */
+
 final class YsmKeyframeExpression {
     record Context(double animationTime, double health, double maxHealth) {}
     interface Value { double get(Context context); }
@@ -88,7 +88,7 @@ final class YsmKeyframeExpression {
         String identifier = source.substring(start, cursor);
         if (identifier.equals("math.sin") || identifier.equals("math.cos")) {
             require("("); Value argument = conditional(); require(")");
-            // Molang trigonometric functions take degrees, unlike java.lang.Math.
+
             return identifier.equals("math.sin") ? c -> Math.sin(Math.toRadians(argument.get(c)))
                     : c -> Math.cos(Math.toRadians(argument.get(c)));
         }

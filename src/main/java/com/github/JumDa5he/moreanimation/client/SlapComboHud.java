@@ -11,7 +11,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
-/** Rendered only by the existing face screen, above the face with a short per-hit pulse. */
+
 public final class SlapComboHud {
     private static final SlapComboState STATE = new SlapComboState();
     private static final long FADE_MS = 350;
@@ -55,7 +55,7 @@ public final class SlapComboHud {
         if (age < SlapMilestoneState.EFFECT_DURATION_MS) {
             drawCelebration(graphics, width, height, age, now);
         }
-        // Pop from 1.6 to 1, followed by a restrained 1.05 bump; hold, then fade for 550 ms.
+
         float pop;
         if (age < 180) pop = 1 + 0.6f * (float) Math.pow(1 - age / 180f, 3);
         else if (age < 480) pop = 1 + 0.05f * (float) Math.sin(Math.PI * (age - 180) / 300f);
@@ -69,7 +69,7 @@ public final class SlapComboHud {
 
     private static void drawCelebration(GuiGraphics graphics, int width, int height, long age, long now) {
         float progress = age / (float) SlapMilestoneState.EFFECT_DURATION_MS;
-        // Layered edge glow stays outside the face; staggered bursts spread the spectacle over 1.2s.
+
         for (int side : new int[]{-1, 1}) {
             for (int band = 0; band < 8; band++) {
                 int alpha = (int) (65 * (1-progress) * (1-band/8f));
@@ -96,21 +96,21 @@ public final class SlapComboHud {
                 graphics.pose().translate(x, y, 0);
                 graphics.pose().mulPose(Axis.ZP.rotationDegrees(i * 31 + side * t * 240));
                 if (i % 4 == 0) {
-                    // Large star with a bright center and softer halo.
+
                     graphics.fill(-2, -7, 2, 7, ((alpha/4)<<24) | (color & 0xFFFFFF));
                     graphics.fill(-7, -2, 7, 2, ((alpha/4)<<24) | (color & 0xFFFFFF));
                     graphics.fill(-1, -5, 1, 5, color);
                     graphics.fill(-5, -1, 5, 1, color);
                     graphics.fill(-1, -1, 1, 1, (alpha << 24) | 0xFFF5DF);
                 } else if (i % 4 == 1) {
-                    // Bright shard with a fading streak.
+
                     graphics.fill(-8, -1, 0, 1, ((alpha/3)<<24) | (color & 0xFFFFFF));
                     graphics.fill(-2, -1, 3, 2, color);
                 } else if (i % 4 == 2) {
                     graphics.fill(-2, -4, 2, 4, color);
                     graphics.fill(-1, -3, 1, -1, (alpha << 24) | 0xFFF5DF);
                 } else {
-                    // Short ribbon segments rather than a solid screen-covering plane.
+
                     graphics.fill(-5, -1, 0, 1, color);
                     graphics.fill(-1, 0, 1, 4, color);
                     graphics.fill(0, 3, 5, 5, color);

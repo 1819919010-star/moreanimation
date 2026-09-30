@@ -21,8 +21,6 @@ function Write-PixelIcon([string]$Path, [string[]]$Rows, [hashtable]$Palette) {
 }
 
 $itemDir = Join-Path $PSScriptRoot '..\src\main\resources\assets\moreanimation\textures\item'
-# hand.png is generated artwork and intentionally is not overwritten by this
-# deterministic helper; this script now only rebuilds the terminal icon.
 
 $terminalPalette = @{
     D = [System.Drawing.Color]::FromArgb(255, 28, 33, 43)

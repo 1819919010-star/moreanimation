@@ -79,10 +79,16 @@ public class TerminalControlPacket {
                                     MaidAnimationData.formMode(maid)));
                     sendData(player, maid);
                 }
-                case "play" -> MaidAnimationData.start(maid, value, MaidAnimationData.duration(value),
+                case "play" -> {
+                    if (value.startsWith("hand_hold_") || value.startsWith("player_hand_hold_")) return;
+                    MaidAnimationData.start(maid, value, MaidAnimationData.duration(value),
                         "injured_kneel".equals(value) ? MaidAnimationData.PRIORITY_INJURED : MaidAnimationData.PRIORITY_MANUAL,
                         "injured_kneel".equals(value));
-                case "interaction" -> MaidInteractionEvent.requestInteraction(maid, value);
+                }
+                case "interaction" -> {
+                    if ("hand_hold".equals(value)) com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.begin(player, maid);
+                    else MaidInteractionEvent.requestInteraction(maid, value);
+                }
             }
         });
         context.get().setPacketHandled(true);

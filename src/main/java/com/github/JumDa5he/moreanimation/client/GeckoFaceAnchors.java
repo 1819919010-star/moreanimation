@@ -35,13 +35,13 @@ public final class GeckoFaceAnchors {
         for(var entry:ordered){
             String role=FaceHitProjection.role(entry.getKey());if(role.isEmpty()||role.equals("head"))continue;
             Bone b=entry.getValue();
-            // Only the principal head subtree, never Head2 dolls/accessories.
+
             var parent=b.bone.geoBone();boolean belongs=false;
             while(parent!=null){if(parent==head.bone.geoBone()){belongs=true;break;}parent=parent.parent();}
             if(!belongs)continue;
-            // Numeric suffixes can name a whole ear (Left_ear3), not a third segment.
-            // Select the first matching bone below the principal head, not an accessory
-            // or a child segment whose pivot would move the grab zone away from the root.
+
+
+
             if(role.endsWith("Ear")){
                 var ancestor=b.bone.geoBone().parent();boolean segment=false;
                 while(ancestor!=null&&ancestor!=head.bone.geoBone()){
@@ -53,14 +53,14 @@ public final class GeckoFaceAnchors {
             Vector3f p=new Vector3f(b.bone.getPivotX()/16f,b.bone.getPivotY()/16f,b.bone.getPivotZ()/16f);
             var cubes=b.bone.geoBone().cubes();
             boolean eye=role.endsWith("Eye");
-            // An empty eye controller's pivot is not evidence of a visible eye.
+
             if(eye&&cubes.getCubeCount()==0)continue;
             if(role.endsWith("Ear"))anchors.putIfAbsent(role+"Root",b.matrix.transformPosition(new Vector3f(p)));
             if(cubes.getCubeCount()>0){
                 p.zero();for(int i=0;i<cubes.getCubeCount();i++)p.add(new Vector3f(cubes.position(i)).fma(.5f,cubes.dx(i)).fma(.5f,cubes.dy(i)).fma(.5f,cubes.dz(i)));
                 p.div(cubes.getCubeCount());
                 if(eye){
-                    // Centre of the front surface, not the controller pivot or cube volume.
+
                     Vector3f min=new Vector3f(Float.POSITIVE_INFINITY),max=new Vector3f(Float.NEGATIVE_INFINITY);
                     for(int i=0;i<cubes.getCubeCount();i++)for(int k=0;k<8;k++){
                         Vector3f v=new Vector3f(cubes.position(i));

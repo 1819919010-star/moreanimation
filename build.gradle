@@ -16,7 +16,7 @@ java {
 
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
-    // accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
     copyIdeResources = true
     runs {
         configureEach {
@@ -77,7 +77,7 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     // 目前只有 CurseForge Maven 能够支持同时下载模组和源码，方便开发
-    // Current Only CurseForge Maven can support downloading both mod and source code, which is convenient for development
+
     implementation fg.deobf('curse.maven:touhou-little-maid-355044:8061847')
     implementation fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'

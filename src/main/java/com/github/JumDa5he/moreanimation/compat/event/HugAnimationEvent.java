@@ -103,6 +103,8 @@ public class HugAnimationEvent {
         // 新拥抱只由动作控制终端触发；保留旧会话维护代码以兼容存量会话。
     }
 
+    public static boolean isHandHoldConflict(EntityMaid maid) { return HUG_START_TIMES.containsKey(maid.getUUID()); }
+
     private static void scanNewPairs(ServerLevel level, long now) {
         // 使用 maid-only 快照，避免直接迭代 ServerLevel 的 live all-entity collection。
         for (EntityMaid a : level.getEntities(EntityTypeTest.forClass(EntityMaid.class),

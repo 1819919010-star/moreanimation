@@ -2,7 +2,7 @@ package com.github.JumDa5he.moreanimation.compat.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 
-/** Compact renderer-independent target pose shared by Gecko and YSM face interaction. */
+
 public record FacePoseData(byte grabMode, boolean faceOverstretch,
                            float headYaw, float headPitch, float headOffsetX, float headOffsetY,
                            float leftYaw, float leftPitch, float leftRoll,

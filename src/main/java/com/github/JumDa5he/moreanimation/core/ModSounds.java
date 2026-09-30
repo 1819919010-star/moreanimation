@@ -12,5 +12,7 @@ public final class ModSounds {
             DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MoreAnimation.MOD_ID);
     public static final RegistryObject<SoundEvent> SLAP = SOUNDS.register("slap", () ->
             SoundEvent.createVariableRangeEvent(new ResourceLocation(MoreAnimation.MOD_ID, "slap")));
+    public static final RegistryObject<SoundEvent> TAIL_SNIFF = SOUNDS.register("tail_sniff", () ->
+            SoundEvent.createVariableRangeEvent(new ResourceLocation(MoreAnimation.MOD_ID, "tail_sniff")));
     private ModSounds() {}
 }

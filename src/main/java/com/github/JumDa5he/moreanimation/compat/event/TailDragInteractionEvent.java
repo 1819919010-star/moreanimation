@@ -29,6 +29,7 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid = MoreAnimation.MOD_ID)
 public final class TailDragInteractionEvent {
     private static final double START_DISTANCE_SQR = 8.0 * 8.0;
+    private static final double INTERACTION_DISTANCE = 1.40;
     private static final double MAX_DISTANCE_SQR = 10.0 * 10.0;
     private static final float MAX_YAW = (float) Math.toRadians(55.0);
     private static final float MIN_PITCH = (float) Math.toRadians(-40.0);
@@ -36,6 +37,7 @@ public final class TailDragInteractionEvent {
     public static final long OVERSTRETCH_DAMAGE_INTERVAL = 40;
     public static final long OVERSTRETCH_DIALOGUE_COOLDOWN = 400;
     private static final int OVERSTRETCH_DIALOGUE_COUNT = 7;
+    private static final int SNIFF_DIALOGUE_COUNT = 7;
     private static final Map<UUID, Session> BY_PLAYER = new HashMap<>();
     private static final Map<UUID, UUID> BY_MAID = new HashMap<>();
     private static final Map<UUID, Long> LAST_OVERSTRETCH_DIALOGUE = new HashMap<>();
@@ -44,17 +46,22 @@ public final class TailDragInteractionEvent {
     }
 
     public static void begin(ServerPlayer player, EntityMaid maid) {
-        if (!player.isAlive() || player.isSpectator() || !maid.isAlive() || maid.isRemoved()
+        if (StandingHandEvent.controls(maid) || StandingHandEvent.playerBusy(player.getUUID())
+                || !player.isAlive() || player.isSpectator() || !maid.isAlive() || maid.isRemoved()
                 || player.level() != maid.level() || player.distanceToSqr(maid) > START_DISTANCE_SQR
                 || !maid.isOwnedBy(player) || BY_MAID.containsKey(maid.getUUID())
                 || MaidAnimationData.isFaceInteractionActive(maid)) return;
 
+        if (MaidInteractionEvent.isMovementControlled(maid) || maid.isSleeping()
+                || !com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)) return;
         stop(player);
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.acquire(maid,
+                com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.Kind.TAIL)) return;
         Vec3 playerAnchor = player.position();
         float playerYaw = player.getYRot();
         float playerPitch = player.getXRot();
         Vec3 look = Vec3.directionFromRotation(0, playerYaw);
-        Vec3 maidAnchor = playerAnchor.add(look.x * 1.65, 0, look.z * 1.65);
+        Vec3 maidAnchor = playerAnchor.add(look.x * INTERACTION_DISTANCE, 0, look.z * INTERACTION_DISTANCE);
         float maidYaw = playerYaw;
         boolean sittingBase = maid.isMaidInSittingPose();
 
@@ -81,6 +88,7 @@ public final class TailDragInteractionEvent {
         Session session = BY_PLAYER.remove(player.getUUID());
         if (session == null) return;
         BY_MAID.remove(session.maidId());
+        com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.release(session.maidId());
         EntityMaid maid = knownMaid != null ? knownMaid : resolveMaid(player, session);
         int maidEntityId = maid != null ? maid.getId() : session.maidEntityId();
         if (maid != null) {
@@ -97,17 +105,30 @@ public final class TailDragInteractionEvent {
                 new TailInteractionSessionPacket(maidEntityId, false, false));
     }
 
-    public static void receivePose(ServerPlayer player, int maidId, boolean grabbed,
+    public static void receivePose(ServerPlayer player, int maidId, String tailId, boolean grabbed, boolean frozen,
                                    boolean overstretch, float yaw, float pitch) {
         Session session = BY_PLAYER.get(player.getUUID());
         EntityMaid maid = session == null ? null : resolveMaid(player, session);
         if (session == null || maid == null || maid.getId() != maidId || !valid(player, maid, session)
+                || tailId.isEmpty() || tailId.length() > 128 || !tailId.matches("[A-Za-z0-9_.-]+")
                 || !Float.isFinite(yaw) || !Float.isFinite(pitch)) return;
-        float safeYaw = grabbed ? Mth.clamp(yaw, -MAX_YAW, MAX_YAW) : 0;
-        float safePitch = grabbed ? Mth.clamp(pitch, MIN_PITCH, MAX_PITCH) : 0;
-        session.overstretch().setActive(grabbed && overstretch, maid.level().getGameTime());
+        float safeYaw = grabbed || frozen ? Mth.clamp(yaw, -MAX_YAW, MAX_YAW) : 0;
+        float safePitch = grabbed || frozen ? Mth.clamp(pitch, MIN_PITCH, MAX_PITCH) : 0;
+
+
+        OverstretchStatus status = session.overstretch();
+        long now = maid.level().getGameTime();
+        boolean sniffing = frozen && !grabbed;
+        if (sniffing && !status.sniffing && now - status.lastSniffDialogue >= 40) {
+            status.lastSniffDialogue = now;
+            int line = maid.getRandom().nextInt(SNIFF_DIALOGUE_COUNT) + 1;
+            maid.getChatBubbleManager().addTextChatBubble("bubble.moreanimation.tail_sniff." + line);
+        }
+        status.sniffing = sniffing;
+        session.overstretch().lastUpdate = now;
+        session.overstretch().setActive(grabbed && !frozen && overstretch, maid.level().getGameTime());
         MoreAnimationNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> maid),
-                new TailPoseSyncPacket(maidId, true, session.sittingBase(), grabbed, safeYaw, safePitch));
+                new TailPoseSyncPacket(maidId, true, session.sittingBase(), tailId, grabbed, frozen, safeYaw, safePitch));
     }
 
     @SubscribeEvent
@@ -197,6 +218,7 @@ public final class TailDragInteractionEvent {
 
     private static boolean valid(ServerPlayer player, EntityMaid maid, Session session) {
         return player.isAlive() && !player.isSpectator() && maid.isAlive() && !maid.isRemoved()
+                && com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)
                 && player.level().dimension().equals(session.dimension()) && player.level() == maid.level()
                 && player.distanceToSqr(maid) <= MAX_DISTANCE_SQR
                 && maid.isOwnedBy(player);
@@ -229,6 +251,7 @@ public final class TailDragInteractionEvent {
         OverstretchStatus status = session.overstretch();
         if (!status.active) return;
         long now = maid.level().getGameTime();
+        if (now - status.lastUpdate > 20) { status.setActive(false, now); return; }
         if (now - status.lastDamageTime < OVERSTRETCH_DAMAGE_INTERVAL) return;
         status.lastDamageTime = now;
         if (!maid.hurt(maid.damageSources().generic(), 1.0f) || !maid.isAlive()) return;
@@ -251,6 +274,9 @@ public final class TailDragInteractionEvent {
     private static final class OverstretchStatus {
         private boolean active;
         private long lastDamageTime;
+        private long lastUpdate;
+        private boolean sniffing;
+        private long lastSniffDialogue = -1000;
 
         private void setActive(boolean active, long now) {
             if (active && !this.active) lastDamageTime = now;

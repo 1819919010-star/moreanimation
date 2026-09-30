@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Server-authoritative, non-persistent twenty-second broken-leg state. */
+
 @Mod.EventBusSubscriber(modid = MoreAnimation.MOD_ID)
 public final class BrokenLegEvent {
     private static final long DURATION_TICKS = 20L * 20L;
@@ -46,7 +46,7 @@ public final class BrokenLegEvent {
         }
     }
 
-    /** Used when travel reads its final ground speed; never mutates the normal speed chain. */
+
     public static boolean isMovementSlowed(EntityMaid maid) {
         State state = STATES.get(maid.getUUID());
         if (state != null) {
@@ -54,7 +54,7 @@ public final class BrokenLegEvent {
                     && state.dimension.equals(maid.level().dimension())
                     && maid.level().getGameTime() < state.expiresAt;
         }
-        // Client state is supplied by the existing animation sync packet.
+
         String action = MaidAnimationData.activeAction(maid);
         return maid.level().isClientSide()
                 && ("fallen_broken_leg".equals(action) || "broken_leg_crawl".equals(action));

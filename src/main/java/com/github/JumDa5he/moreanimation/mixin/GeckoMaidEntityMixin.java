@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.mixin;
 
+import com.github.JumDa5he.moreanimation.client.MaidRenderTarget;
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.tartaricacid.touhoulittlemaid.client.entity.GeckoMaidEntity;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.geo.animated.AnimatedGeoModel;
@@ -15,9 +16,10 @@ public abstract class GeckoMaidEntityMixin {
     @Inject(method = "updateHead", at = @At("HEAD"), cancellable = true, remap = false)
     private void moreanimation$keepBowHeadExclusive(EntityModelData data, AnimatedGeoModel currentModel,
                                                      boolean update, CallbackInfo ci) {
-        var maid = ((GeckoMaidEntity<?>) (Object) this).getMaid();
-        if (maid != null && maid.asEntity() instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid entity
+        var entity = MaidRenderTarget.resolve(this);
+        if (entity != null
                 && (MaidAnimationData.isActive(entity, "maid_bow")
+                || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(MaidAnimationData.activeAction(entity))
                 || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.isSlap(entity))) {
             ci.cancel();
         }

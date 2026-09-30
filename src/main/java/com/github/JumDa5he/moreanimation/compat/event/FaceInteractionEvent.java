@@ -71,11 +71,16 @@ public final class FaceInteractionEvent {
             player.displayClientMessage(Component.translatable("message.moreanimation.face_not_yours"), true);
             return;
         }
-        if (!player.isAlive() || player.isSpectator() || !maid.isAlive() || maid.isRemoved()
+        if (StandingHandEvent.controls(maid) || StandingHandEvent.playerBusy(player.getUUID())
+                || !player.isAlive() || player.isSpectator() || !maid.isAlive() || maid.isRemoved()
                 || player.level() != maid.level() || player.distanceToSqr(maid) > START_DISTANCE_SQR
                 || BY_MAID.containsKey(maid.getUUID()) || MaidAnimationData.isTailInteractionActive(maid)) return;
 
+        if (MaidInteractionEvent.isMovementControlled(maid) || maid.isSleeping()
+                || !com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)) return;
         stop(player);
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.acquire(maid,
+                com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.Kind.FACE)) return;
         Vec3 playerAnchor = player.position();
         float playerYaw = player.getYRot();
         float originalPlayerPitch = player.getXRot();
@@ -105,6 +110,7 @@ public final class FaceInteractionEvent {
         Session session = BY_PLAYER.remove(player.getUUID());
         if (session == null) return;
         BY_MAID.remove(session.maidId());
+        com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.release(session.maidId());
         EntityMaid maid = knownMaid != null ? knownMaid : resolveMaid(player, session);
         int maidEntityId = maid != null ? maid.getId() : session.maidEntityId();
         if (maid != null) {
@@ -158,7 +164,7 @@ public final class FaceInteractionEvent {
         }
         if(packet.phase()!=FaceClickPacket.RELEASE)return;
         FaceHitZone zone=clicks.pending;
-        clicks.pending=FaceHitZone.NONE; // Consume once, before hurt/events can reenter.
+        clicks.pending=FaceHitZone.NONE;                                                 
         if(zone==FaceHitZone.NONE||now-clicks.pressedAt>CLICK_MAX_TICKS
                 ||now-clicks.lastClick<CLICK_COOLDOWN_TICKS)return;
         clicks.lastClick=now;
@@ -169,7 +175,7 @@ public final class FaceInteractionEvent {
                     showRandomBubble(maid, "bubble.moreanimation.eye_poke.", EYE_POKE_DIALOGUE_COUNT);
                 }
             }
-            finally { stop(player,maid); } // The same AI/camera/session cleanup as ESC.
+            finally { stop(player,maid); }                                              
         }
         MoreAnimationNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(()->maid),
                 new FaceClickSyncPacket(maid.getId(),zone));
@@ -200,7 +206,7 @@ public final class FaceInteractionEvent {
         if (!MaidAnimationData.start(maid, action, SLAP_DURATION_TICKS, 80, false)) return;
         session.clicks().pending = FaceHitZone.NONE;
         session.faceDamage().setActive(false, FacePoseData.NONE, now);
-        // Each accepted alternating stroke is a distinct hit, even inside vanilla's i-frame window.
+
         int oldInvulnerability = maid.invulnerableTime;
         maid.invulnerableTime = 0;
         boolean damaged;
@@ -292,6 +298,7 @@ public final class FaceInteractionEvent {
 
     private static boolean valid(ServerPlayer player, EntityMaid maid, Session session) {
         return player.isAlive() && !player.isSpectator() && maid.isAlive() && !maid.isRemoved()
+                && com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.canAcquire(maid)
                 && player.level().dimension().equals(session.dimension()) && player.level() == maid.level()
                 && player.distanceToSqr(maid) <= MAX_DISTANCE_SQR && isOwner(maid, player);
     }
@@ -402,7 +409,7 @@ public final class FaceInteractionEvent {
             boolean stale = now - lastPoseTime > POSE_TIMEOUT;
             lastPoseTime = now;
             if (active && (!this.active || this.mode != mode || stale)) activeSince = now;
-            // Damage cooldown survives release/re-grab; only continuous hold time resets.
+
             if (!active) activeSince = 0;
             this.mode = mode;
             this.active = active;

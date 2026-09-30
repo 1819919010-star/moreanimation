@@ -3,7 +3,7 @@ package com.github.JumDa5he.moreanimation.mixin;
 import com.github.JumDa5he.moreanimation.compat.animation.GameLostAnimation;
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.client.TailInteractionState;
-import com.github.tartaricacid.touhoulittlemaid.api.entity.IMaid;
+import com.github.JumDa5he.moreanimation.client.MaidRenderTarget;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.AnimationManager;
 import com.github.tartaricacid.touhoulittlemaid.client.entity.GeckoMaidEntity;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -31,7 +31,7 @@ import java.util.WeakHashMap;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mixin(AnimationManager.class)
+@Mixin(value=AnimationManager.class, priority=1100)
 public class AnimationManagerMixin {
     /** tailcircle 蛋糕探测缓存（每 20 tick 重扫） */
     private static final Map<UUID, Boolean> CAKE_NEAR_CACHE = new ConcurrentHashMap<>();
@@ -51,15 +51,14 @@ public class AnimationManagerMixin {
     @Inject(method = "predicateParallel", at = @At("HEAD"), remap = false, cancellable = true)
     private void onPredicateParallel(AnimationEvent<GeckoMaidEntity<?>> event, String animationName,
                                      CallbackInfoReturnable<PlayState> cir) {
-        IMaid maid = event.getAnimatableEntity().getMaid();
-        if (maid == null) return;
-        EntityMaid entity = (EntityMaid) maid.asEntity();
+        EntityMaid entity = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        if (entity == null) return;
         UUID uuid = entity.getUUID();
         if (TailInteractionState.isInteractionActive(entity.getId()) && !"parallel5".equals(animationName)) {
-            // Resource-pack pre_parallel/parallel channels are also the model's visibility setup:
-            // they hide editor helpers, alternate forms and placeholder geometry. Let TLM keep
-            // evaluating those channels; TailInteractionState overwrites Tail rotations after all
-            // controllers finish, so their tail motion still cannot compete with procedural input.
+
+
+
+
             return;
         }
         if ("parallel5".equals(animationName)) {
@@ -82,12 +81,13 @@ public class AnimationManagerMixin {
             return;
         }
         if (!"parallel6".equals(animationName)) return;
+        if (com.github.JumDa5he.moreanimation.client.CuteYsmOrder.bodyBusy(entity)) return;
         String action = MaidAnimationData.activeAction(entity);
         AnimationController<?> interactionController = event.getController();
         boolean slap = "slapright".equals(action) || "slapleft".equals(action);
-        if (slap) {
+        if (slap || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action)) {
             slapTransitionLengths.putIfAbsent(interactionController, interactionController.transitionLengthTicks);
-            // The impact peaks at 2.5 ticks: do not spend those ticks blending away the hit.
+
             interactionController.transitionLengthTicks = 0;
         } else {
             Double originalTransition = slapTransitionLengths.remove(interactionController);
@@ -112,9 +112,8 @@ public class AnimationManagerMixin {
     @Inject(method = "predicateMain", at = @At("HEAD"), remap = false, cancellable = true)
     private void onPredicateMain(AnimationEvent<GeckoMaidEntity<?>> event,
                                  CallbackInfoReturnable<PlayState> cir) {
-        IMaid maid = event.getAnimatableEntity().getMaid();
-        if (maid == null) return;
-        EntityMaid entity = (EntityMaid) maid.asEntity();
+        EntityMaid entity = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        if (entity == null) return;
         UUID uuid = entity.getUUID();
         AnimationController<?> controller = event.getController();
         if (TailInteractionState.isInteractionActive(entity.getId())) {
@@ -136,10 +135,15 @@ public class AnimationManagerMixin {
             controller.markNeedsReload();
         }
         tailExclusiveBases.remove(uuid);
+        if (com.github.JumDa5he.moreanimation.client.CuteYsmOrder.bodyBusy(entity)) return;
         String action = MaidAnimationData.activeAction(entity);
         if (action.isEmpty() && entity.getPersistentData().getBoolean("moreanimation_tailpull")) action = "tailpull";
         if (action.isEmpty() || MaidAnimationData.isParallelAction(action)) {
             forcedActionStart.remove(uuid);
+            if(com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.protectedMaid(entity)) {
+                String base=entity.isMaidInSittingPose()?"sit":entity.getDeltaMovement().horizontalDistanceSqr()>.0001?"walk":"idle";
+                cir.setReturnValue(play(event,base,ILoopType.EDefaultLoopTypes.LOOP)?PlayState.CONTINUE:PlayState.STOP);
+            }
             return;
         }
         long start = MaidAnimationData.activeStart(entity);
@@ -156,9 +160,8 @@ public class AnimationManagerMixin {
     @Inject(method = "predicateMisc", at = @At("HEAD"), remap = false, cancellable = true)
     private void onPredicateMisc(AnimationEvent<GeckoMaidEntity<?>> event,
                                  CallbackInfoReturnable<PlayState> cir) {
-        IMaid maid = event.getAnimatableEntity().getMaid();
-        if (maid == null) return;
-        EntityMaid entity = (EntityMaid) maid.asEntity();
+        EntityMaid entity = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        if (entity == null) return;
         UUID uuid = entity.getUUID();
         if (entity.isSleeping()) {
             GameLostAnimation.releaseMisc(uuid);
@@ -171,6 +174,9 @@ public class AnimationManagerMixin {
             cir.setReturnValue(PlayState.STOP);
             cir.cancel();
             return;
+        }
+        if (com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.protectedMaid(entity)) {
+            GameLostAnimation.releaseMisc(uuid);cir.setReturnValue(PlayState.STOP);return;
         }
         if (GameLostAnimation.isMiscBlocked(uuid)) return;
 
@@ -229,7 +235,7 @@ public class AnimationManagerMixin {
             }
         }
 
-        // hugtogether: two maids within one block (server-synced flag)
+
         if (entity.getPersistentData().getBoolean("moreanimation_hugging")) {
             ResourceLocation hugAnimFile = event.getAnimatableEntity().getAnimationFileLocation();
             if (hugAnimFile != null && GeckoLibCache.getInstance().getAnimations().get(hugAnimFile).animations().containsKey("hugtogether")) {
@@ -365,8 +371,8 @@ public class AnimationManagerMixin {
             at = @At("HEAD"), remap = false, cancellable = true)
     private void moreanimation$suppressTailInteractionControllers(AnimationEvent<GeckoMaidEntity<?>> event,
                                                                    CallbackInfoReturnable<PlayState> cir) {
-        IMaid maid = event.getAnimatableEntity().getMaid();
-        if (maid != null && TailInteractionState.isInteractionActive(maid.asEntity().getId())) {
+        EntityMaid maid = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        if (maid != null && TailInteractionState.isInteractionActive(maid.getId())) {
             cir.setReturnValue(PlayState.STOP);
             cir.cancel();
         }

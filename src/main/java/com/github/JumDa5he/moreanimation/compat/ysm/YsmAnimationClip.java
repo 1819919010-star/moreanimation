@@ -82,7 +82,7 @@ public final class YsmAnimationClip {
         return read(reader, actions, (action, error) -> { throw error; });
     }
 
-    /** A bad clip must not prevent valid clips or procedural poses from being consumed. */
+
     public static Map<String, YsmAnimationClip> read(Reader reader, Set<String> actions,
             java.util.function.BiConsumer<String, RuntimeException> onError) {
         JsonObject animations = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonObject("animations");

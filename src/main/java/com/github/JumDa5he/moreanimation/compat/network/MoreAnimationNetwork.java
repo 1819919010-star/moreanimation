@@ -8,7 +8,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.Optional;
 
 public class MoreAnimationNetwork {
-    private static final String PROTOCOL_VERSION = "9";
+    private static final String PROTOCOL_VERSION = "14";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation("moreanimation:anim"),
             () -> PROTOCOL_VERSION,
@@ -17,6 +17,9 @@ public class MoreAnimationNetwork {
     );
 
     public static void init() {
+        CHANNEL.registerMessage(32, CuteProtectionPacket.class, CuteProtectionPacket::encode, CuteProtectionPacket::new, CuteProtectionPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(30, StandingHandStatePacket.class, StandingHandStatePacket::encode, StandingHandStatePacket::new, StandingHandStatePacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(31, StandingHandCancelPacket.class, StandingHandCancelPacket::encode, StandingHandCancelPacket::new, StandingHandCancelPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         CHANNEL.registerMessage(25, SlapFeedbackPacket.class, SlapFeedbackPacket::encode,
                 SlapFeedbackPacket::new, SlapFeedbackPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         CHANNEL.registerMessage(24, FaceStrokePacket.class, FaceStrokePacket::encode,

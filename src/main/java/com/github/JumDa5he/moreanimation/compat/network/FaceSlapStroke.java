@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.network;
 
-/** Continuous held stroke, measured in screen-height units and server milliseconds. */
+
 public final class FaceSlapStroke {
     public static final double SLAP_MIN_DISTANCE = 0.32;
     public static final long SLAP_MAX_TIME = 250;
@@ -32,7 +32,7 @@ public final class FaceSlapStroke {
             direction = next;
         }
         if (direction == 0 && next != 0) direction = next;
-        // Keep the extremum until a real reversal exceeds the noise threshold.
+
         if (next != 0 && direction != 0 && next != direction && Math.abs(step) < REVERSAL_DISTANCE) return 0;
         lastX = x; lastY = y;
         lastTime = now;

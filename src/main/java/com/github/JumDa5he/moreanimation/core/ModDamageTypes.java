@@ -8,7 +8,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.level.Level;
 
-/** DamageType entries are loaded by the server's data registry from damage_type JSON. */
+
 public final class ModDamageTypes {
     public static final ResourceKey<DamageType> PLAYING = ResourceKey.create(Registries.DAMAGE_TYPE,
             new ResourceLocation(MoreAnimation.MOD_ID, "playing"));

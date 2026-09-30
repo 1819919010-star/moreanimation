@@ -1,6 +1,6 @@
 package com.github.JumDa5he.moreanimation.client;
 
-/** Session-local, monotonic real-time combo bookkeeping; no damage or gesture prediction. */
+
 public final class SlapComboState {
     public static final long TIMEOUT_MS = 2000;
     private int count;

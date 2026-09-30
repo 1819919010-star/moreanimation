@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Per-maid animation preferences and the lightweight special-action lock. */
+
 public final class MaidAnimationData {
     public static final String TAIL_INTERACTION_ACTIVE = "moreanimation_tail_drag_active";
     public static final String FACE_INTERACTION_ACTIVE = "moreanimation_face_interaction_active";
@@ -89,11 +89,11 @@ public final class MaidAnimationData {
     }
 
     public static boolean isParallelAction(String action) {
-        return PARALLEL_ACTIONS.contains(action);
+        return PARALLEL_ACTIONS.contains(action) || StandingHandAnimations.ACTIONS.contains(action);
     }
 
     public static boolean isLoopingAction(String action) {
-        return LOOPING_ACTIONS.contains(action);
+        return LOOPING_ACTIONS.contains(action) || StandingHandAnimations.HOLD.equals(action);
     }
 
     public static List<String> enabledActions(EntityMaid maid, String category) {
@@ -214,7 +214,10 @@ public final class MaidAnimationData {
     }
 
     public static boolean start(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.permitsBody(maid,action,priority)) return false;
         long now = maid.level().getGameTime();
+        if (com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.controls(maid)
+                && !StandingHandAnimations.ACTIONS.contains(action) && priority < PRIORITY_DEATH) return false;
         CompoundTag data = maid.getPersistentData();
         if (data.getBoolean(TAIL_INTERACTION_ACTIVE) && priority < PRIORITY_DEATH) return false;
         if (maid.isSleeping() && !isAllowedWhileSleeping(action)) return false;
@@ -233,6 +236,7 @@ public final class MaidAnimationData {
     }
 
     public static void clientStart(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
+        if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.permitsBody(maid,action,priority)) return;
         if (maid.isSleeping() && !isAllowedWhileSleeping(action)) return;
         CompoundTag data = maid.getPersistentData();
         data.putString(ACTIVE, action);
@@ -246,6 +250,12 @@ public final class MaidAnimationData {
             maid.deathTime = 0;
         }
         GameLostAnimation.ACTIVE.put(maid.getUUID(), "special:" + action);
+    }
+
+    public static void clientStartAt(EntityMaid maid, String action, long since, int duration, int priority) {
+        clientStart(maid, action, duration, priority, false);
+        maid.getPersistentData().putLong(ACTIVE_START, since);
+        maid.getPersistentData().putLong(ACTIVE_UNTIL, since + duration);
     }
 
     public static void stop(EntityMaid maid) {
@@ -297,7 +307,7 @@ public final class MaidAnimationData {
         return maid.getPersistentData().getBoolean(FACE_INTERACTION_ACTIVE);
     }
 
-    /** Manual terminal expressions always take precedence over the timed random overlay. */
+
     public static String effectiveExpression(EntityMaid maid) {
         CompoundTag data = maid.getPersistentData();
         if (maid.level().isClientSide()) return data.getString(CLIENT_EXPRESSION);

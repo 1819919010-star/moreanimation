@@ -89,7 +89,7 @@ public final class YsmAnimationClipCheck {
             equal(channel(clip, "RightEyePublic", 6).sample(0, 20, 20)[0], 1);
             equal(Math.abs(channel(clip, "Head", 0).sample(0.125, 20, 20)[1]), 60);
         }
-        // Every registered action/expression, including the newest clips, must parse and sample.
+
         for (var clip : clips.values()) {
             for (var channel : clip.channels) {
                 for (double seconds : new double[]{0, 0.125, 0.75, 1.625, clip.length}) {

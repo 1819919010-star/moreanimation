@@ -63,11 +63,11 @@ public final class FaceHitProjection {
         if(center==null||x==null||y==null){clear();return;}
         double rx=Math.hypot(x.x-center.x,x.y-center.y),ry=Math.hypot(y.x-center.x,y.y-center.y);
         if(!Double.isFinite(rx+ry)||rx<.001||ry<.001){clear();return;}
-        // Last-resort uncalibrated head profile; real visible eye geometry takes priority.
+
         Point le=anchor(projection,anchors,"leftEye",head, halfWidth*.64f,halfHeight*.57f,-halfWidth);
         Point re=anchor(projection,anchors,"rightEye",head,-halfWidth*.64f,halfHeight*.57f,-halfWidth);
         if(le==null||re==null){clear();return;}
-        // Eye names may be anatomical, but clicks are deliberately visual screen left/right.
+
         if(le.x>re.x){Point tmp=le;le=re;re=tmp;}
         Point la=project(projection,anchors.get("leftEar"));
         Point ra=project(projection,anchors.get("rightEar"));
@@ -108,7 +108,7 @@ public final class FaceHitProjection {
     private static boolean inside(double x,double y,Point p,double rx,double ry){
         if(p==null)return false;double dx=(x-p.x)/rx,dy=(y-p.y)/ry;return dx*dx+dy*dy<=1;
     }
-    /** Frozen at mouse-down, so the animated ear cannot feed back into its own target. */
+
     public record EarReference(double rootX,double headX,double radius) {
         public float outward(double mouseX) {
             double side=rootX<headX?-1:1;

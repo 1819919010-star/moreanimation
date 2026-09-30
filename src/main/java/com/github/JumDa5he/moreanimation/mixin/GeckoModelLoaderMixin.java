@@ -29,6 +29,8 @@ public class GeckoModelLoaderMixin {
     @Inject(method = "reload", at = @At("HEAD"), remap = false)
     private static void moreanimation$clearAnimationCache(CallbackInfo ci) {
         moreanimation$animations = null;
+        com.github.JumDa5he.moreanimation.client.StandingHandBoneMask.reload();
+        com.github.JumDa5he.moreanimation.client.BegBoneMask.reload();
     }
 
     @Inject(method = "registerMaidAnimations", at = @At("HEAD"), remap = false)
@@ -37,8 +39,8 @@ public class GeckoModelLoaderMixin {
         AnimationFile additions = moreanimation$getAnimations();
         if (additions != null) {
             additions.animations().forEach((name, animation) -> {
-                // A skin pack's own animation is authoritative. Replacing an existing idle/main
-                // animation can remove its model-specific visibility rules (for example Expression_7).
+
+
                 if (!animationFile.animations().containsKey(name)) {
                     animationFile.putAnimation(name, animation);
                 }
@@ -52,6 +54,11 @@ public class GeckoModelLoaderMixin {
         AnimationFile loaded = new AnimationFile();
         if (!moreanimation$merge(MOREANIMATION_ACTIONS, loaded)) return null;
         moreanimation$merge(MOREANIMATION_COMPAT, loaded);
+        AnimationFile hand = new AnimationFile();
+        moreanimation$merge(new ResourceLocation(MoreAnimation.MOD_ID, "animation/hold_hand.animation.json"), hand);
+        hand.animations().forEach((name, animation) -> {
+            if (com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(name)) loaded.putAnimation(name, animation);
+        });
         moreanimation$animations = loaded;
         MOREANIMATION_LOGGER.info("Loaded {} shared maid animations", loaded.animations().size());
         return loaded;

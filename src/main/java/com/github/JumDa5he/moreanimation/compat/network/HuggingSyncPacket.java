@@ -3,6 +3,7 @@ package com.github.JumDa5he.moreanimation.compat.network;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.Entity;
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -30,8 +31,9 @@ public class HuggingSyncPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
+            if (Minecraft.getInstance().level == null) return;
             Entity entity = Minecraft.getInstance().level.getEntity(entityId);
-            if (entity != null) {
+            if (entity instanceof EntityMaid) {
                 var data = entity.getPersistentData();
                 data.putBoolean(TAG_HUGGING, hugging);
             }

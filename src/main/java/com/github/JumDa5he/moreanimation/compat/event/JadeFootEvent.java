@@ -32,7 +32,7 @@ public final class JadeFootEvent {
     private JadeFootEvent() {
     }
 
-    /** Forge 1.20's finalized damage event is the closest equivalent to the 1.21 damage hook. */
+
     @SubscribeEvent
     public static void onDamage(LivingDamageEvent event) {
         if (!(event.getEntity() instanceof EntityMaid maid) || maid.level().isClientSide()) return;
@@ -86,7 +86,7 @@ public final class JadeFootEvent {
                 "moreanimation.dialogue.kick_launch.stranger.");
     }
 
-    /** Called by the existing per-maid server tick; no additional entity scan is introduced. */
+
     public static void serverTick(EntityMaid maid) {
         LaunchState state = LAUNCHED.get(maid.getUUID());
         if (state == null) return;
@@ -104,8 +104,8 @@ public final class JadeFootEvent {
         maid.getBrain().eraseMemory(MemoryModuleType.PATH);
         lockLaunchFacing(maid, state.launchFacingYaw);
 
-        // Vanilla attack knockback is applied after LivingDamageEvent. Reassert the configured
-        // impulse on the following maid tick so the copied 1.21 launch vector is retained.
+
+
         if (!state.impulseReasserted) {
             applyLaunchVelocity(maid, state.direction);
             state.impulseReasserted = true;

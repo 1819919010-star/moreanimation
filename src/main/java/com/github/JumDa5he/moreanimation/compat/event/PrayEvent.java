@@ -96,7 +96,7 @@ public class PrayEvent {
             return;
         }
         for (EntityMaid maid : loadedMaids(level)) {
-            if (!maid.isAlive() || PENDING_ANIMS.containsKey(maid.getUUID())) {
+            if (!maid.isAlive() || StandingHandEvent.controls(maid) || PENDING_ANIMS.containsKey(maid.getUUID())) {
                 continue;
             }
             if (isCooldown(maid, now)) {
@@ -115,7 +115,7 @@ public class PrayEvent {
         }
     }
 
-    /** Returns a detached, maid-only snapshot instead of the level's live all-entity iterable. */
+
     private static List<? extends EntityMaid> loadedMaids(ServerLevel level) {
         return level.getEntities(EntityTypeTest.forClass(EntityMaid.class),
                 maid -> maid.level() == level && !maid.isRemoved());

@@ -19,8 +19,14 @@ public final class ClientKeyMappings {
     public static final KeyMapping FACE_INTERACTION = new KeyMapping(
             "key.moreanimation.face_interaction",
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_B,
+            GLFW.GLFW_KEY_COMMA,
             "key.categories.moreanimation");
+
+    public static final KeyMapping TAIL_SNIFF = new KeyMapping(
+            "key.moreanimation.tail_sniff", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R,
+            "key.categories.moreanimation");
+
+
 
     private ClientKeyMappings() {
     }
@@ -28,6 +34,7 @@ public final class ClientKeyMappings {
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
         event.register(TAIL_INTERACTION);
+        event.register(TAIL_SNIFF);
         event.register(FACE_INTERACTION);
     }
 }

@@ -16,12 +16,12 @@ public final class FaceInteractionMath {
     public static Vector3f screenToModel(float right, float up, float cameraYaw,
                                          float cameraPitch, float maidYaw) {
         double yaw = Math.toRadians(cameraYaw), pitch = Math.toRadians(cameraPitch);
-        // Camera right = forward x world-up; camera up = right x forward.
+
         Vector3f world = new Vector3f(
                 (float) (-Math.cos(yaw) * right + Math.sin(yaw) * Math.sin(pitch) * up),
                 (float) (Math.cos(pitch) * up),
                 (float) (-Math.sin(yaw) * right - Math.cos(yaw) * Math.sin(pitch) * up));
-        // Inverse of LivingEntity renderer's RY(180 - bodyYaw), no guessed facing sign.
+
         return world.rotateY((float) Math.toRadians(maidYaw - 180.0));
     }
 
@@ -40,11 +40,11 @@ public final class FaceInteractionMath {
     public static Vector3f earDelta(Vector3f drag, boolean left, float outward) {
         if (!Float.isFinite(outward)) return new Vector3f();
         Vector3f result = earDelta(drag);
-        // A downward pull naturally folds inward unless there is a clear outward pull.
+
         float down = Math.max(0, -drag.y);
         float inwardBias = down * .35f * (1 - smoothRange(outward, .025f, .10f));
         float amount = (float)Math.tanh((outward - inwardBias) / EAR_DRAG_RESPONSE * 1.25f);
-        // Blockbench: Left_ear +Z is outward; Right_ear -Z is outward.
+
         result.z = (left ? 1 : -1) * (amount < 0 ? EAR_INWARD_LIMIT : EAR_SIDE_LIMIT) * amount;
         return result;
     }
@@ -70,7 +70,7 @@ public final class FaceInteractionMath {
         return anchor.sub(moved);
     }
 
-    /** Small post-threshold displacement follows the rotation arc, including depth. */
+
     public static Vector3f earStretchOffset(float pitch, float yaw, float roll, float stretch) {
         if (!Float.isFinite(pitch) || !Float.isFinite(yaw) || !Float.isFinite(roll)
                 || !Float.isFinite(stretch) || stretch <= 0) return new Vector3f();
@@ -80,7 +80,7 @@ public final class FaceInteractionMath {
         return arc.normalize().mul(Math.min(stretch, 0.25f) * 0.96f);
     }
 
-    /** Compose a model-space delta before bind rotation, instead of adding Euler axes. */
+
     public static Vector3f compose(float x, float y, float z, float pitch, float yaw, float roll) {
         return eulerZYX(new Quaternionf().rotationZYX(roll, yaw, pitch)
                 .mul(new Quaternionf().rotationZYX(z, y, x)));
@@ -88,8 +88,8 @@ public final class FaceInteractionMath {
 
     private static Vector3f eulerZYX(Quaternionf q) {
         q.normalize();
-        // Explicit inverse of Rz * Ry * Rx. JOML 1.10.5 getEulerAnglesZYX has a
-        // different X denominator; it fails round-trip for heavily tilted ear binds.
+
+
         double sinY = Math.max(-1, Math.min(1, 2 * (q.w * q.y - q.z * q.x)));
         if (Math.abs(sinY) > 0.999999) {
             return new Vector3f(0, (float) Math.copySign(Math.PI / 2, sinY),
@@ -102,7 +102,7 @@ public final class FaceInteractionMath {
                 (float) Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)));
     }
 
-    /** Dominant local axis along the upright ear, after accounting for its bind rotation. */
+
     public static int longitudinalAxis(float x, float y, float z) {
         Vector3f up = new Quaternionf().rotationZYX(z, y, x).conjugate()
                 .transform(new Vector3f(0, 1, 0));

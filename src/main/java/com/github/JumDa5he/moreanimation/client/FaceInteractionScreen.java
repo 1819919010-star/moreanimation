@@ -23,7 +23,7 @@ public final class FaceInteractionScreen extends Screen {
                     : zone == FaceInteractionState.HoverZone.FACE ? 0xCCFFFFFF : 0xCC78D8FF;
             graphics.fill(mouseX - 2, mouseY - 2, mouseX + 3, mouseY + 3, color);
         }
-        graphics.drawCenteredString(font, Component.translatable("gui.moreanimation.face_interaction.hint"),
+        graphics.drawCenteredString(font, Component.translatable("gui.moreanimation.face_interaction.hint", ClientKeyMappings.FACE_INTERACTION.getTranslatedKeyMessage()),
                 width / 2, height - 28, 0xFFFFFFFF);
         SlapComboHud.render(graphics, font, width, height);
         super.render(graphics, mouseX, mouseY, partialTick);

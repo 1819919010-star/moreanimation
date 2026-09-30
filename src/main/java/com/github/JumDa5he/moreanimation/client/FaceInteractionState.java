@@ -62,7 +62,7 @@ public final class FaceInteractionState {
     private static double grabX, grabY;
     private static FaceHitProjection.EarReference grabbedEarReference;
     private static int syncTicker;
-    private static final double DRAG_THRESHOLD = 0.012; // Fraction of screen height.
+    private static final double DRAG_THRESHOLD = 0.012;                              
     private static final long CLICK_MAX_MS = 300;
     private static boolean pointerDown;
     private static HoverZone pressedZone = HoverZone.NONE;
@@ -339,7 +339,7 @@ public final class FaceInteractionState {
             grabX = pointerX; grabY = pointerY;
             wasSlapping = false;
         }
-        // Hover only changes the cursor highlight. No valid held grab means zero target.
+
         if (!active || grabMode == FacePoseData.NONE) {
             state.setTarget(FacePoseData.zero());
             return;
@@ -348,7 +348,7 @@ public final class FaceInteractionState {
         if (mc.level == null || !(mc.level.getEntity(maidId) instanceof EntityMaid maid)) return;
         float aspect = (float) mc.getWindow().getGuiScaledWidth()
                 / Math.max(1, mc.getWindow().getGuiScaledHeight());
-        // Distance in screen-height units, measured from the actual mouse-down point.
+
         float dx = (float) (normalizedX - grabX) * aspect;
         float dy = (float) (grabY - normalizedY);
         float distance = (float) Math.hypot(dx, dy);
@@ -359,7 +359,7 @@ public final class FaceInteractionState {
         float headOffsetX = 0, headOffsetY = 0;
         EarTarget left = EarTarget.ZERO, right = EarTarget.ZERO;
         if (grabMode == FacePoseData.FACE) {
-            // Normalize each direction to its actual screen edge, not aspect-dependent pixels.
+
             float edgeX = (float) ((normalizedX - grabX) / Math.max(0.05,
                     normalizedX >= grabX ? 1 - grabX : grabX));
             float edgeY = (float) ((grabY - normalizedY) / Math.max(0.05,
@@ -372,10 +372,10 @@ public final class FaceInteractionState {
         } else {
             float stretch = FaceInteractionMath.smoothRange(distance,
                     EAR_STRETCH_START, EAR_STRETCH_FULL);
-            // Up/down explicitly bends into model depth; left/right bends sideways.
+
             float outward=grabbedEarReference==null?0:grabbedEarReference.outward(normalizedX);
-            // Blend only the initial engagement; classification uses the target relative to
-            // the ear root/head midline, never the arbitrary point clicked on the ear tip.
+
+
             outward*=FaceInteractionMath.smoothRange(distance,0,.025f);
             Vector3f swing = FaceInteractionMath.earDelta(local, grabMode == FacePoseData.LEFT_EAR, outward);
             Vector3f offset = FaceInteractionMath.earStretchOffset(swing.x, swing.y, swing.z,
@@ -384,7 +384,7 @@ public final class FaceInteractionState {
                     offset.x, offset.y, stretch * 0.25f);
             if (grabMode == FacePoseData.LEFT_EAR) left = ear;
             else right = ear;
-            // Ear Grab/Stretch never drives the head, even at maximum stretch.
+
             headYaw = headPitch = 0;
         }
         state.setTarget(new FacePoseData(grabMode, faceOverstretch,
@@ -426,7 +426,7 @@ public final class FaceInteractionState {
         SmoothedPose pose=POSES.computeIfAbsent(entityId,ignored->new SmoothedPose());
         if(zone.eye()) {
             pose.setInteraction(false);
-            pose.clearAll(); // No drag, ear or stretch state survives a forced exit.
+            pose.clearAll();                                                         
         }
         pose.click(zone);
     }
@@ -472,7 +472,7 @@ public final class FaceInteractionState {
                 b.getPositionX(), b.getPositionY(), b.getPositionZ(), b.getScaleX(), b.getScaleY(), b.getScaleZ()});
     }
 
-    /** Undo our last render before Gecko evaluates (or reuses) its cached pose. */
+
     public static void restoreGecko(AnimationProcessor processor) {
         Map<IBone, float[]> saved = GECKO_SAVED.remove(processor);
         if (saved == null) return;
@@ -488,8 +488,8 @@ public final class FaceInteractionState {
         IBone bone = processor.getBone("Head");
         if (bone == null) bone = processor.getBone("MHead");
         if (bone == null) bone = processor.getBone("AllHead");
-        // Some packs use Head2 for a doll/accessory while keeping the real Head.
-        // Only fall back to it when the model truly has no normal head control.
+
+
         if (bone == null) bone = processor.getBone("Head2");
         if (bone != null) applyHeadBone(bone, pose, reset);
     }
@@ -502,7 +502,7 @@ public final class FaceInteractionState {
         bone.setRotationX(rotation.x);
         bone.setRotationY(rotation.y);
         bone.setRotationZ(rotation.z);
-        // No extra head roll: this keeps the neck stable during horizontal drags.
+
         bone.setPositionX(bone.getPositionX() - pose.headOffsetX());
         bone.setPositionY(bone.getPositionY() + pose.headOffsetY());
     }
@@ -566,7 +566,7 @@ public final class FaceInteractionState {
         bone.setRotationX(rotation.x);
         bone.setRotationY(rotation.y);
         bone.setRotationZ(rotation.z);
-        // The root stays at its authored pivot. Only distal segments translate after stretching.
+
         bone.setPositionX(bone.getPositionX() - pose.offsetX() * positionWeight);
         bone.setPositionY(bone.getPositionY() + pose.offsetY() * positionWeight);
         bone.setPositionZ(bone.getPositionZ() + earDepthOffset(pose) * positionWeight);
@@ -587,7 +587,7 @@ public final class FaceInteractionState {
         else bone.setScaleZ(bone.getScaleZ() * scale);
     }
 
-    // Decode depth from the same smoothed rotation/stretch; no second input or physics state.
+
     public static float earDepthOffset(EarPoseSnapshot pose) {
         return FaceInteractionMath.earStretchOffset(pose.pitch(), pose.yaw(), pose.roll(), pose.stretch()).z;
     }

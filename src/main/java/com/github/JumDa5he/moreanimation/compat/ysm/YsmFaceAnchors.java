@@ -12,7 +12,7 @@ import org.joml.Vector3f;
 import java.lang.reflect.Method;
 import java.util.*;
 
-/** Read-only anchor adapter for official YSM 2.6.5. No second animation/interaction state. */
+
 public final class YsmFaceAnchors {
     private static final String P="com.elfmcys.yesstevemodel.";
     private static Method entity,model,bones,name,location,track,setTrack,asLocation;
@@ -44,12 +44,12 @@ public final class YsmFaceAnchors {
                 else named.putIfAbsent(key,bone);
             }
             Map<String,Object> selected=new LinkedHashMap<>();
-            // Prefer authored underscored principal ears over accessory LeftEar/RightEar.
+
             String[][] aliases={{"head","mhead","allhead"},{"lefteye","eyeleft","leye"},{"righteye","eyeright","reye"},{"leftear","earleft","lear"},{"rightear","earright","rear"}};
             String[] roles={"head","leftEye","rightEye","leftEar","rightEar"};
             for(int i=0;i<roles.length;i++)for(String alias:aliases[i])if(named.containsKey(alias)){selected.put(roles[i],named.get(alias));break;}
-            // A numbered underscored ear may be the principal root, while unnumbered
-            // LeftEar/RightEar belongs to a doll accessory in the same model.
+
+
             for(String side:List.of("left","right")){
                 Object preferred=null;int best=Integer.MAX_VALUE;
                 for(Object candidate:((Map<?,?>)bones.invoke(runtime)).values()){
@@ -59,7 +59,7 @@ public final class YsmFaceAnchors {
                 }
                 if(preferred!=null)selected.put(side+"Ear",preferred);
             }
-            // Use YSM's actual head locator chain, including every parent and final scale.
+
             ILocationModel loc=(ILocationModel)location.invoke(runtime);
             if(loc.headBones().isEmpty()||!selected.containsKey("head"))return;
             Map<Object,Boolean> tracked=new IdentityHashMap<>();
@@ -76,8 +76,8 @@ public final class YsmFaceAnchors {
             Matrix4f head=new Matrix4f(stack.last().pose());
             Vector3f expected=head.transformPosition(new Vector3f());
             Vector3f rawHead=read(abs,p.selected.get("head")).div(16);
-            // The abs-pivot buffer is native-owned. Validate its space against the exact
-            // public head locator chain, never silently apply a second world/view transform.
+
+
             Matrix4f root=rendered.last().pose();
             Vector3f localHead=root.transformPosition(new Vector3f(rawHead));
             boolean modelSpace=localHead.distanceSquared(expected)<.0004f;
@@ -92,8 +92,8 @@ public final class YsmFaceAnchors {
             float width=.25f;
             Object le=p.selected.get("leftEar"),re=p.selected.get("rightEar");
             if(le!=null&&re!=null){float span=read(pivot,le).distance(read(pivot,re))/16f;if(span>.08f&&span<2)width=span*.5f;}
-            // Calibrated from the visible eyelid-base front faces in Blockbench, not
-            // from arbitrary Eye/EyeDot controller pivots (some are outside the head).
+
+
             Object lb=p.named.get("lefteyelidbase"),rb=p.named.get("righteyelidbase");
             if(lb!=null&&rb!=null&&p.named.containsKey("eyelid")&&p.named.containsKey("eyes")){
                 float unit=read(pivot,lb).distance(read(pivot,rb))/4.65f;
@@ -112,9 +112,9 @@ public final class YsmFaceAnchors {
                     }
                 }
             }
-            // Use the same named bone and public transform adapter as the final pose.
-            // The native abs buffer alone cannot disambiguate a mirrored X convention
-            // by checking Head (whose X pivot is zero).
+
+
+
             if(p.named.containsKey("ear"))for(String side:List.of("left","right")){
                 Object bone=p.selected.get(side+"Ear");if(bone==null)continue;
                 PoseStack earStack=belowHead(head,p);
@@ -122,8 +122,8 @@ public final class YsmFaceAnchors {
                 RenderUtils.prepMatrixForBone(earStack,locate(bone));
                 Vector3f v=read(pivot,bone).div(16);
                 anchors.put(side+"EarRoot",earStack.last().pose().transformPosition(new Vector3f(v)));
-                // Mid-ear point in the authored bind frame; current rotation/scale then
-                // moves the hotspot together with the actual ear, retaining its identity.
+
+
                 Vector3f bind=(Vector3f)bone.getClass().getMethod("OO0ooO00OoO00o0OO0OOooO0").invoke(bone);
                 Vector3f mid=new org.joml.Quaternionf().rotationZYX(bind.z,bind.y,bind.x).conjugate()
                         .transform(new Vector3f(0,width*.65f,0));

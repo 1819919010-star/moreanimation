@@ -5,7 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
-/** One server-confirmed slap; only the player controlling this face session receives it. */
+
 public record SlapFeedbackPacket(int maidId) {
     public SlapFeedbackPacket(FriendlyByteBuf buffer) { this(buffer.readVarInt()); }
     public void encode(FriendlyByteBuf buffer) { buffer.writeVarInt(maidId); }

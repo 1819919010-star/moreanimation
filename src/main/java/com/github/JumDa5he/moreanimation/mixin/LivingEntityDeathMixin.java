@@ -22,7 +22,7 @@ public abstract class LivingEntityDeathMixin {
         int elapsed = maid.getPersistentData().getInt("moreanimation_death_animation_elapsed");
         if (elapsed < delay) {
             maid.getPersistentData().putInt("moreanimation_death_animation_elapsed", elapsed + 1);
-            // Keep the complete model upright while retaining the vanilla red damage overlay.
+
             deathTime = 0;
             self.hurtTime = 2;
             self.hurtDuration = 2;

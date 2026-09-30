@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Chooses the vanilla beg pose or beg2 once for each real TLM begging session. */
+
 @Mod.EventBusSubscriber(modid = MoreAnimation.MOD_ID)
 public final class BegAnimationEvent {
     private static final int SESSION_DURATION = 72_000;

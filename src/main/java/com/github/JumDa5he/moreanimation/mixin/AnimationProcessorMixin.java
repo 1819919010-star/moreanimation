@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.mixin;
 
+import com.github.JumDa5he.moreanimation.client.MaidRenderTarget;
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.client.FaceInteractionState;
 import com.github.JumDa5he.moreanimation.client.TailInteractionState;
@@ -24,17 +25,18 @@ import java.util.List;
 import java.util.Set;
 
 
-/** Makes custom expression/interaction layers exclusive only for bones they animate. */
+
 @Mixin(AnimationProcessor.class)
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AnimationProcessorMixin {
     private static final Set<String> EXCLUSIVE_INTERACTIONS = Set.of(
             "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether",
-            "slapright", "slapleft");
+            "slapright", "slapleft", "beg2", "sit2");
     @Inject(method = "tickAnimation", at = @At("HEAD"), remap = false)
     private void moreanimation$restoreFacePose(double seekTime, AnimationEvent event,
                                                AnimationContext context,
                                                CallbackInfoReturnable<Boolean> cir) {
+        if (MaidRenderTarget.resolve(event.getAnimatableEntity()) == null) return;
         FaceInteractionState.restoreGecko((AnimationProcessor) (Object) this);
     }
 
@@ -42,18 +44,19 @@ public class AnimationProcessorMixin {
     private void moreanimation$hideUnusedExpressionSeven(double seekTime, AnimationEvent event,
                                                           AnimationContext context,
                                                           CallbackInfoReturnable<Boolean> cir) {
+        EntityMaid maid = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        if (maid == null) return;
         IBone expressionSeven = ((AnimationProcessor) (Object) this).getBone("Expression_7");
         if (expressionSeven != null) {
-            // TLM's Wine Fox animations hide unused expressions with scale 0. Apply the same
-            // rule after every controller has committed so a parallel layer cannot reveal it.
+
+
             expressionSeven.setScaleX(0);
             expressionSeven.setScaleY(0);
             expressionSeven.setScaleZ(0);
         }
         Object animatable = event.getAnimatableEntity();
-        if (animatable instanceof GeckoMaidEntity<?> gecko
-                && gecko.getMaid().asEntity() instanceof EntityMaid maid) {
-            TailInteractionState.applyGecko((AnimationProcessor) (Object) this, maid);
+        if (animatable instanceof GeckoMaidEntity<?> gecko) {
+            TailInteractionState.applyGecko((AnimationProcessor) (Object) this, maid, gecko.getCurrentModel());
             FaceInteractionState.applyGecko((AnimationProcessor) (Object) this, maid);
         }
     }
@@ -67,15 +70,47 @@ public class AnimationProcessorMixin {
                                                       boolean rendererDirty, boolean scheduledUpdate) {
         controller.process(seekTime, event, evaluator, modelRendererList,
                 crashWhenCantFindBone, rendererDirty, scheduledUpdate);
+        EntityMaid maid = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        if (maid == null) return;
+        if (!"parallel_6_controller".equals(controller.getName())) {
+            boolean beg = MaidAnimationData.isActive(maid, "beg2");
+            Set<String> owned = beg ? com.github.JumDa5he.moreanimation.client.BegBoneMask.bones()
+                    : com.github.JumDa5he.moreanimation.client.StandingHandBoneMask.bones(MaidAnimationData.activeAction(maid));
+            for (Object value : controller.getBoneAnimationQueues()) {
+                BoneAnimationQueue queue = (BoneAnimationQueue) value;
+                if (owned.contains(queue.topLevelSnapshot.bone.getName())) {
+                    queue.rotationQueue().clear(); queue.positionQueue().clear();
+                    if (beg || "parallel_7_controller".equals(controller.getName())) queue.scaleQueue().clear();
+                }
+            }
+        }
+        if ("parallel_7_controller".equals(controller.getName())) {
+            for (Object value : controller.getBoneAnimationQueues()) {
+                BoneAnimationQueue queue=(BoneAnimationQueue)value;
+                if(com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.owns(maid,queue.topLevelSnapshot.bone.getName())) {
+                    queue.rotationQueue().clear();queue.positionQueue().clear();queue.scaleQueue().clear();
+                }
+            }
+        }
+        // 第二坐姿走主控制器；只替换纵向高度，不改变动作通道、旋转或其他坐姿。
+        if ("main".equals(controller.getName()) && MaidAnimationData.isActive(maid, "sit2")
+                && controller.getCurrentAnimation() != null && "sit2".equals(controller.getCurrentAnimation().animationName)
+                && event.getAnimatableEntity() instanceof GeckoMaidEntity<?> gecko) {
+            double tick = Math.max(0, maid.level().getGameTime() - MaidAnimationData.activeStart(maid) + event.getPartialTick());
+            com.github.JumDa5he.moreanimation.client.Sit2Height.apply(gecko.getAnimation("sit"),
+                    controller.getCurrentAnimation(), controller.getBoneAnimationQueues(), tick,
+                    controller.getAnimationState() == com.github.tartaricacid.touhoulittlemaid.geckolib3.core.AnimationState.TRANSITIONING);
+        }
         if (!moreanimation$isExclusiveController(controller, event)) return;
 
         for (Object value : controller.getBoneAnimationQueues()) {
             BoneAnimationQueue queue = (BoneAnimationQueue) value;
+            if (queue.rotationQueue().isEmpty() && queue.positionQueue().isEmpty() && queue.scaleQueue().isEmpty()) continue;
             BoneTopLevelSnapshot snapshot = queue.topLevelSnapshot;
             BoneSnapshot initial = snapshot.bone.getInitialSnapshot();
 
-            // Preserve skin-defined visibility unless this custom animation explicitly changes
-            // scale. This avoids revealing optional meshes such as Expression_7.
+
+
             boolean changesScale = !queue.scaleQueue().isEmpty();
             float scaleX = snapshot.scaleValueX;
             float scaleY = snapshot.scaleValueY;
@@ -98,11 +133,11 @@ public class AnimationProcessorMixin {
     }
 
     private static boolean moreanimation$isExclusiveController(AnimationController controller, AnimationEvent event) {
+        EntityMaid maid = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        if (maid == null) return false;
         if ("parallel_7_controller".equals(controller.getName())) return true;
         if (!"parallel_6_controller".equals(controller.getName())) return false;
-        Object animatable = event.getAnimatableEntity();
-        if (!(animatable instanceof GeckoMaidEntity<?> gecko)
-                || !(gecko.getMaid().asEntity() instanceof EntityMaid maid)) return false;
-        return EXCLUSIVE_INTERACTIONS.contains(MaidAnimationData.activeAction(maid));
+        return EXCLUSIVE_INTERACTIONS.contains(MaidAnimationData.activeAction(maid))
+                || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(MaidAnimationData.activeAction(maid));
     }
 }

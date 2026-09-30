@@ -5,6 +5,9 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 public final class TailInteractionScreen extends Screen {
     private boolean closingFromServer;
+    private boolean sniffKeyDown;
+    private boolean showHitZones;
+    private boolean hitZoneKeyDown;
 
     public TailInteractionScreen() {
         super(Component.translatable("gui.moreanimation.tail_interaction"));
@@ -13,11 +16,12 @@ public final class TailInteractionScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         TailInteractionState.updatePointer(mouseX, mouseY);
+        if (showHitZones) TailHitProjection.draw(graphics, mouseX, mouseY);
         if (TailInteractionState.isPointerOverTail()) {
             int color = TailInteractionState.isGrabbed() ? 0xFFE8B45A : 0xCCFFFFFF;
             graphics.fill(mouseX - 2, mouseY - 2, mouseX + 3, mouseY + 3, color);
         }
-        graphics.drawCenteredString(font, Component.translatable("gui.moreanimation.tail_interaction.hint"),
+        graphics.drawCenteredString(font, Component.translatable("gui.moreanimation.tail_interaction.selection_hint", ClientKeyMappings.TAIL_SNIFF.getTranslatedKeyMessage()),
                 width / 2, height - 28, 0xFFFFFFFF);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -48,11 +52,28 @@ public final class TailInteractionScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_F8) {
+            if (!hitZoneKeyDown) showHitZones = !showHitZones;
+            hitZoneKeyDown = true;
+            return true;
+        }
+        if (ClientKeyMappings.TAIL_SNIFF.matches(keyCode, scanCode)) {
+            if (!sniffKeyDown) TailInteractionState.beginSniff();
+            sniffKeyDown = true;
+            return true;
+        }
         if (ClientKeyMappings.TAIL_INTERACTION.matches(keyCode, scanCode)) {
             onClose();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_F8) hitZoneKeyDown = false;
+        if (ClientKeyMappings.TAIL_SNIFF.matches(keyCode, scanCode)) sniffKeyDown = false;
+        return super.keyReleased(keyCode, scanCode, modifiers);
     }
 
     @Override
@@ -64,6 +85,12 @@ public final class TailInteractionScreen extends Screen {
     public void closeFromServer() {
         closingFromServer = true;
         if (minecraft != null) minecraft.setScreen(null);
+    }
+
+    @Override
+    public void removed() {
+        if (!closingFromServer) TailInteractionState.requestStop();
+        super.removed();
     }
 
     @Override

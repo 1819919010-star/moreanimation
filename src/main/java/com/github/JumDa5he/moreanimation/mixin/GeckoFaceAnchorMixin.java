@@ -14,12 +14,18 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GeoReplacedEntityRenderer.class)
 public abstract class GeckoFaceAnchorMixin {
+    @Inject(method="render(Lnet/minecraft/world/entity/LivingEntity;Lcom/github/tartaricacid/touhoulittlemaid/geckolib3/core/AnimatableEntity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V",at=@At("RETURN"),remap=false)
+    private void moreanimation$groomRestore(LivingEntity e,AnimatableEntity a,float yaw,float partial,PoseStack p,MultiBufferSource b,int light,CallbackInfo ci){
+        if(e instanceof EntityMaid && a!=null)com.github.JumDa5he.moreanimation.groom.GroomingGeometry.restore(a.getCurrentModel());
+    }
     @Shadow(remap=false) protected AnimatableEntity currentAnimatable;
     @Inject(method="renderEarly(Lnet/minecraft/world/entity/LivingEntity;Lcom/mojang/blaze3d/vertex/PoseStack;FLnet/minecraft/client/renderer/MultiBufferSource;Lcom/mojang/blaze3d/vertex/VertexConsumer;IIFFFF)V",at=@At("RETURN"),remap=false)
     private void moreanimation$captureFace(LivingEntity entity,PoseStack stack,float partialTick,MultiBufferSource buffers,VertexConsumer buffer,int light,int overlay,float r,float g,float b,float a,CallbackInfo ci){
         if(entity instanceof EntityMaid maid&&currentAnimatable!=null) {
+            com.github.JumDa5he.moreanimation.groom.GroomingGeometry.gecko(maid,currentAnimatable.getCurrentModel(),stack);
             com.github.JumDa5he.moreanimation.client.StandingHandPose.gecko(maid,currentAnimatable.getCurrentModel(),stack,partialTick);
             GeckoFaceAnchors.capture(maid.getId(),currentAnimatable.getCurrentModel(),stack);
+            com.github.JumDa5he.moreanimation.client.tears.GeckoTearAnchors.capture(maid,currentAnimatable.getCurrentModel(),currentAnimatable.getTextureLocation(),stack,buffers,light);
             com.github.JumDa5he.moreanimation.client.GeckoTailAnchors.capture(maid.getId(),currentAnimatable.getCurrentModel(),currentAnimatable.getTextureLocation(),stack);
         }
     }

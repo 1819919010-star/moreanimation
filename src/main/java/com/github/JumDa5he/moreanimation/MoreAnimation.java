@@ -38,6 +38,7 @@ public class MoreAnimation {
             event.accept(ModItems.EXPRESSION_ITEM);
             event.accept(ModItems.HAND);
             event.accept(ModItems.JADE_FOOT);
+            event.accept(ModItems.GROOMING_BRUSH);
         }
     }
 }

@@ -29,6 +29,9 @@ import java.util.Set;
 @Mixin(AnimationProcessor.class)
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AnimationProcessorMixin {
+    @org.spongepowered.asm.mixin.Unique private float moreanimation$originalYaw, moreanimation$originalPitch;
+    @org.spongepowered.asm.mixin.Unique private boolean moreanimation$gazeChanged;
+
     private static final Set<String> EXCLUSIVE_INTERACTIONS = Set.of(
             "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether",
             "slapright", "slapleft", "beg2", "sit2");
@@ -36,7 +39,18 @@ public class AnimationProcessorMixin {
     private void moreanimation$restoreFacePose(double seekTime, AnimationEvent event,
                                                AnimationContext context,
                                                CallbackInfoReturnable<Boolean> cir) {
-        if (MaidRenderTarget.resolve(event.getAnimatableEntity()) == null) return;
+        EntityMaid maid = MaidRenderTarget.resolve(event.getAnimatableEntity());
+        moreanimation$gazeChanged = false;
+        if (maid == null) return;
+        var gaze = com.github.JumDa5he.moreanimation.client.LeanLookGaze.correct(maid,
+                context.data().netHeadYaw, context.data().headPitch, event.getPartialTick());
+        if (gaze != null) {
+            moreanimation$originalYaw = context.data().netHeadYaw;
+            moreanimation$originalPitch = context.data().headPitch;
+            moreanimation$gazeChanged = true;
+            context.data().netHeadYaw = gaze.x;
+            context.data().headPitch = gaze.y;
+        }
         FaceInteractionState.restoreGecko((AnimationProcessor) (Object) this);
     }
 
@@ -44,6 +58,11 @@ public class AnimationProcessorMixin {
     private void moreanimation$hideUnusedExpressionSeven(double seekTime, AnimationEvent event,
                                                           AnimationContext context,
                                                           CallbackInfoReturnable<Boolean> cir) {
+        if (moreanimation$gazeChanged) {
+            context.data().netHeadYaw = moreanimation$originalYaw;
+            context.data().headPitch = moreanimation$originalPitch;
+            moreanimation$gazeChanged = false;
+        }
         EntityMaid maid = MaidRenderTarget.resolve(event.getAnimatableEntity());
         if (maid == null) return;
         IBone expressionSeven = ((AnimationProcessor) (Object) this).getBone("Expression_7");
@@ -72,15 +91,22 @@ public class AnimationProcessorMixin {
                 crashWhenCantFindBone, rendererDirty, scheduledUpdate);
         EntityMaid maid = MaidRenderTarget.resolve(event.getAnimatableEntity());
         if (maid == null) return;
+        if (com.github.JumDa5he.moreanimation.groom.GroomingSession.posed(maid) && !"main".equals(controller.getName()) && !"parallel_5_controller".equals(controller.getName())) {
+            for (Object value : controller.getBoneAnimationQueues()) {
+                BoneAnimationQueue q=(BoneAnimationQueue)value;
+                if(com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.owns(maid,q.topLevelSnapshot.bone.getName())) {q.rotationQueue().clear();q.positionQueue().clear();q.scaleQueue().clear();}
+            }
+        }
         if (!"parallel_6_controller".equals(controller.getName())) {
             boolean beg = MaidAnimationData.isActive(maid, "beg2");
-            Set<String> owned = beg ? com.github.JumDa5he.moreanimation.client.BegBoneMask.bones()
+            boolean lean = com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.isPlaying(maid);
+            Set<String> owned = lean ? com.github.JumDa5he.moreanimation.client.BegBoneMask.leanBones(MaidAnimationData.activeAction(maid)) : beg ? com.github.JumDa5he.moreanimation.client.BegBoneMask.bones()
                     : com.github.JumDa5he.moreanimation.client.StandingHandBoneMask.bones(MaidAnimationData.activeAction(maid));
             for (Object value : controller.getBoneAnimationQueues()) {
                 BoneAnimationQueue queue = (BoneAnimationQueue) value;
-                if (owned.contains(queue.topLevelSnapshot.bone.getName())) {
+                if (owned.contains(queue.topLevelSnapshot.bone.getName()) || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid) && com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.owns(maid,queue.topLevelSnapshot.bone.getName())) {
                     queue.rotationQueue().clear(); queue.positionQueue().clear();
-                    if (beg || "parallel_7_controller".equals(controller.getName())) queue.scaleQueue().clear();
+                    if (beg || lean || "parallel_7_controller".equals(controller.getName())) queue.scaleQueue().clear();
                 }
             }
         }
@@ -137,7 +163,7 @@ public class AnimationProcessorMixin {
         if (maid == null) return false;
         if ("parallel_7_controller".equals(controller.getName())) return true;
         if (!"parallel_6_controller".equals(controller.getName())) return false;
-        return EXCLUSIVE_INTERACTIONS.contains(MaidAnimationData.activeAction(maid))
+        return com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid) || com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.isPlaying(maid) || EXCLUSIVE_INTERACTIONS.contains(MaidAnimationData.activeAction(maid))
                 || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(MaidAnimationData.activeAction(maid));
     }
 }

@@ -66,7 +66,7 @@ public final class StandingHandEvent {
                 &&!p.isInWaterOrBubble()&&!m.isInWaterOrBubble()&&!p.getAbilities().flying;
     }
     public static boolean begin(ServerPlayer p, EntityMaid m) {
-        if(controls(m)||playerBusy(p.getUUID())) { hint(p,"busy"); return false; }
+        if(controls(m)||playerBusy(p.getUUID()) || com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(m) || com.github.JumDa5he.moreanimation.groom.GroomingSession.playerBusy(p.getUUID())) { hint(p,"busy"); return false; }
         if(!safe(p,m)||p.distanceToSqr(m)>MAX_REQUEST_DISTANCE*MAX_REQUEST_DISTANCE
                 ||MaidInteractionEvent.isMovementControlled(m)||!p.onGround()
                 ||MaidAnimationData.isActive(m)&&MaidAnimationData.activePriority(m)>=MaidAnimationData.PRIORITY_INJURED) {

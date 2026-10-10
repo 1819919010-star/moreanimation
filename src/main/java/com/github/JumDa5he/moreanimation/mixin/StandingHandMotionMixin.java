@@ -12,6 +12,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class StandingHandMotionMixin {
     @Inject(method="serverAiStep",at=@At("RETURN"))
     private void moreanimation$afterControls(CallbackInfo ci) {
-        if((Object)this instanceof EntityMaid maid)StandingHandEvent.afterControls(maid);
+        if((Object)this instanceof EntityMaid maid){StandingHandEvent.afterControls(maid);com.github.JumDa5he.moreanimation.groom.GroomingSession.afterControls(maid);}
     }
 }

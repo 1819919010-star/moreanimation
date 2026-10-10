@@ -834,7 +834,7 @@ public final class FaceInteractionState {
     public static boolean slapPlaying(int entityId) {
         var level = Minecraft.getInstance().level;
         return level != null && level.getEntity(entityId) instanceof EntityMaid maid
-                && FaceInteractionEvent.isSlap(maid);
+                && FaceInteractionEvent.controlsFaceBody(maid);
     }
 
     private static void sendStroke(byte phase) {

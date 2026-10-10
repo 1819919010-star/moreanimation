@@ -31,6 +31,7 @@ public class GeckoModelLoaderMixin {
         moreanimation$animations = null;
         com.github.JumDa5he.moreanimation.client.StandingHandBoneMask.reload();
         com.github.JumDa5he.moreanimation.client.BegBoneMask.reload();
+        com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.reload();
     }
 
     @Inject(method = "registerMaidAnimations", at = @At("HEAD"), remap = false)

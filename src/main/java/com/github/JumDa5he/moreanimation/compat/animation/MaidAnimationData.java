@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.animation;
 
+import com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent;
 import com.github.JumDa5he.moreanimation.compat.network.AnimationSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.ExpressionSyncPacket;
 import com.github.JumDa5he.moreanimation.compat.network.MoreAnimationNetwork;
@@ -51,6 +52,7 @@ public final class MaidAnimationData {
     public static final int FORM_HUMAN = 1;
     public static final int FORM_FOX = 2;
 
+    public static final int TEMP_EXPRESSION_TICKS = 200;
     public static final int PRIORITY_RANDOM = 10;
     public static final int PRIORITY_MANUAL = 20;
     public static final int PRIORITY_WATER_SHAKE = 30;
@@ -80,7 +82,7 @@ public final class MaidAnimationData {
             "sleep", "come", "sleep2", "situp", "moresleep2", "moresleep3",
             "moresleep4", "moresleep5", "moresleep6");
     static {
-        ACTIONS.put("stand", List.of("circledance", "!??!"));
+        ACTIONS.put("stand", List.of("circledance", "!??!", LeanLookEvent.GROUP));
         ACTIONS.put("sit", List.of("come2", "ha", "tastetail"));
         ACTIONS.put("sleep", List.of("come", "sleep2", "situp"));
     }
@@ -89,7 +91,12 @@ public final class MaidAnimationData {
     }
 
     public static boolean isParallelAction(String action) {
-        return PARALLEL_ACTIONS.contains(action) || StandingHandAnimations.ACTIONS.contains(action);
+        return PARALLEL_ACTIONS.contains(action) || StandingHandAnimations.ACTIONS.contains(action)
+                || LeanLookEvent.LEFT.equals(action) || LeanLookEvent.RIGHT.equals(action);
+    }
+
+    public static boolean isLoopingAction(EntityMaid maid,String action) {
+        return !("game_lost2".equals(action) && com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid)) && isLoopingAction(action);
     }
 
     public static boolean isLoopingAction(String action) {
@@ -99,6 +106,16 @@ public final class MaidAnimationData {
     public static List<String> enabledActions(EntityMaid maid, String category) {
         CompoundTag data = maid.getPersistentData();
         String key = ENABLED_PREFIX + category;
+        if ("stand".equals(category) && !data.getBoolean("moreanimation_lean_look_pool_v1")) {
+            // 旧存档补入一个新候选；保留原先全部关闭的设置，也不在以后重新打开用户关闭的选项。
+            data.putBoolean("moreanimation_lean_look_pool_v1", true);
+            if (data.contains(key, Tag.TAG_LIST) && MoreAnimationConfig.STAND_LEAN_LOOK.get()) {
+                ListTag previous = data.getList(key, Tag.TAG_STRING);
+                if (!previous.isEmpty() && !previous.contains(StringTag.valueOf(LeanLookEvent.GROUP))) {
+                    previous.add(StringTag.valueOf(LeanLookEvent.GROUP));
+                }
+            }
+        }
         if (!data.contains(key, Tag.TAG_LIST)) {
             List<String> defaults = new ArrayList<>(MoreAnimationConfig.getEnabledActions(category));
             writeList(data, key, defaults);
@@ -216,6 +233,9 @@ public final class MaidAnimationData {
     public static boolean start(EntityMaid maid, String action, int duration, int priority, boolean lockMovement) {
         if (!com.github.JumDa5he.moreanimation.compat.cute.CuteInteractionCompat.permitsBody(maid,action,priority)) return false;
         long now = maid.level().getGameTime();
+        if (com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid)
+                && !"game_lost2".equals(action) && priority<=80) return false;
+        if (com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(maid) && !"moresleep5".equals(action) && priority < PRIORITY_DEATH) return false;
         if (com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.controls(maid)
                 && !StandingHandAnimations.ACTIONS.contains(action) && priority < PRIORITY_DEATH) return false;
         CompoundTag data = maid.getPersistentData();
@@ -313,6 +333,8 @@ public final class MaidAnimationData {
         if (maid.level().isClientSide()) return data.getString(CLIENT_EXPRESSION);
         String manual = data.getString(MANUAL_EXPRESSION);
         if (!manual.isEmpty()) return manual;
+        String crying = com.github.JumDa5he.moreanimation.compat.event.CryingEvent.expression(maid);
+        if (!crying.isEmpty()) return crying;
         return maid.level().getGameTime() < data.getLong(RANDOM_EXPRESSION_UNTIL)
                 ? data.getString(RANDOM_EXPRESSION) : "";
     }
@@ -376,7 +398,7 @@ public final class MaidAnimationData {
 
         String expression = EXPRESSIONS.get(maid.getRandom().nextInt(EXPRESSIONS.size()));
         data.putString(RANDOM_EXPRESSION, expression);
-        data.putLong(RANDOM_EXPRESSION_UNTIL, now + 200);
+        data.putLong(RANDOM_EXPRESSION_UNTIL, now + TEMP_EXPRESSION_TICKS);
         syncExpression(maid);
     }
 
@@ -421,6 +443,7 @@ public final class MaidAnimationData {
 
     public static int duration(String action) {
         return switch (action) {
+            case LeanLookEvent.LEFT, LeanLookEvent.RIGHT -> LeanLookEvent.DURATION;
             case "refuse" -> 20;
             case "maid_bow" -> 48;
             case "death_fall" -> 28;

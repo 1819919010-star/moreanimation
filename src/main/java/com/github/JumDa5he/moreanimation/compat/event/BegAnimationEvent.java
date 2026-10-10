@@ -42,6 +42,8 @@ public final class BegAnimationEvent {
             selection = new Selection(maid.level().dimension(), useBeg2);
             SELECTIONS.put(maidId, selection);
         }
+        if (LeanLookEvent.isPlaying(maid) && maid.getOwner() instanceof net.minecraft.world.entity.player.Player owner
+                && !LeanLookEvent.isTempting(maid, owner)) return;
         if (selection.beg2() && !MaidAnimationData.isActive(maid, "beg2")) {
             MaidAnimationData.start(maid, "beg2", SESSION_DURATION,
                     MaidAnimationData.PRIORITY_RANDOM, false);

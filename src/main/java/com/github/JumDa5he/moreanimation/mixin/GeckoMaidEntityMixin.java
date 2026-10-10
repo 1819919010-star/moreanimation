@@ -18,9 +18,9 @@ public abstract class GeckoMaidEntityMixin {
                                                      boolean update, CallbackInfo ci) {
         var entity = MaidRenderTarget.resolve(this);
         if (entity != null
-                && (MaidAnimationData.isActive(entity, "maid_bow")
+                && (com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.isPlaying(entity) || com.github.JumDa5he.moreanimation.groom.GroomingSession.posed(entity) || MaidAnimationData.isActive(entity, "maid_bow")
                 || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(MaidAnimationData.activeAction(entity))
-                || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.isSlap(entity))) {
+                || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.controlsFaceBody(entity))) {
             ci.cancel();
         }
     }

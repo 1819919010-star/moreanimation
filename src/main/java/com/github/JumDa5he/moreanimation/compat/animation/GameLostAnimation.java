@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.animation;
 
+import com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent;
 import com.github.JumDa5he.moreanimation.client.MaidRenderTarget;
 import com.github.JumDa5he.moreanimation.config.MoreAnimationConfig;
 import com.github.JumDa5he.moreanimation.compat.event.JadeFootEvent;
@@ -549,7 +550,7 @@ public class GameLostAnimation {
 
     public static void serverTick(EntityMaid maid) {
         if (maid.level().isClientSide()) return;
-        if (com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.controls(maid)) return;
+        if (com.github.JumDa5he.moreanimation.compat.event.StandingHandEvent.controls(maid) || com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(maid)) return;
         JadeFootEvent.serverTick(maid);
         if (!maid.isAlive()) return;
         if (MaidAnimationData.isTailInteractionActive(maid)) {
@@ -582,11 +583,21 @@ public class GameLostAnimation {
         if (desired.action().equals(current)) return;
         if (managed) MaidAnimationData.stop(maid);
         else if (!current.isEmpty() && MaidAnimationData.activePriority(maid) >= desired.priority()) return;
-        if (MaidAnimationData.start(maid, desired.action(), CONTINUOUS_DURATION,
-                desired.priority(), desired.lockMovement())) {
+        boolean started = "cold_hug_shiver".equals(desired.action())
+                ? startColdShiver(maid, CONTINUOUS_DURATION)
+                : MaidAnimationData.start(maid, desired.action(), CONTINUOUS_DURATION,
+                        desired.priority(), desired.lockMovement());
+        if (started) {
             maid.getPersistentData().putString(MANAGED_ACTION, desired.action());
             maid.getPersistentData().putLong(MANAGED_START, MaidAnimationData.activeStart(maid));
         }
+    }
+
+    /** 细雪原条件与寒冷群系共用动作入口，保持原优先级及移动规则。 */
+    public static boolean startColdShiver(EntityMaid maid, int duration) {
+        if (MaidAnimationData.isActive(maid, "cold_hug_shiver")) return false;
+        return MaidAnimationData.start(maid, "cold_hug_shiver", duration,
+                MaidAnimationData.PRIORITY_INJURED, false);
     }
 
     private static void tickTimedConditions(EntityMaid maid) {
@@ -623,6 +634,9 @@ public class GameLostAnimation {
             MaidAnimationData.start(maid, "lips", 20, MaidAnimationData.PRIORITY_RANDOM, false);
         }
     }
+
+    /** 原有捆绑动作的真实状态；落地与悬空只决定播放哪个片段。 */
+    public static boolean isRestrained(EntityMaid maid) { return maid.isLeashed(); }
 
     private static Desired desiredContinuousAction(EntityMaid maid) {
         String basePoseAction = selectedBasePoseAction(maid);
@@ -698,7 +712,7 @@ public class GameLostAnimation {
             return desired(scheduled, MaidAnimationData.PRIORITY_RANDOM, false);
         }
 
-        if (maid.isLeashed()) {
+        if (isRestrained(maid)) {
             return desired(maid.onGround() ? "game_lost2" : "hang",
                     MaidAnimationData.PRIORITY_RANDOM, false);
         }
@@ -964,6 +978,12 @@ public class GameLostAnimation {
             List<String> pool = MaidAnimationData.enabledActions(entity, state);
             if (!pool.isEmpty()) {
                 String anim = pool.get(entity.getRandom().nextInt(pool.size()));
+                if (LeanLookEvent.GROUP.equals(anim)) {
+                    if (!entity.level().isClientSide()) {
+                        LeanLookEvent.tryStartLeanLook(entity, LeanLookEvent.TriggerReason.RANDOM_IDLE);
+                    }
+                    return null;
+                }
                 SCHEDULED.put(uuid, new Scheduled(state, anim, entity.tickCount, durationOf(anim)));
                 return anim;
             }

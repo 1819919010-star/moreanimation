@@ -13,10 +13,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class StandingHandAiMixin {
     @Redirect(method="customServerAiStep",at=@At(value="INVOKE",target="Lnet/minecraft/world/entity/ai/Brain;tick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/LivingEntity;)V",remap=true),remap=true)
     private void moreanimation$standingBrain(Brain<LivingEntity> brain,ServerLevel level,LivingEntity entity) {
-        if(!(entity instanceof EntityMaid m)||!StandingHandEvent.controls(m))brain.tick(level,entity);
+        if(!(entity instanceof EntityMaid m)||!StandingHandEvent.controls(m)&&!com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(m))brain.tick(level,entity);
     }
     @Inject(method="teleportToOwner",at=@At("HEAD"),cancellable=true)
     private void moreanimation$noFollowTeleport(LivingEntity owner,CallbackInfoReturnable<Boolean> cir) {
-        if(StandingHandEvent.controls((EntityMaid)(Object)this))cir.setReturnValue(false);
+        if(StandingHandEvent.controls((EntityMaid)(Object)this)||com.github.JumDa5he.moreanimation.groom.GroomingSession.controls((EntityMaid)(Object)this))cir.setReturnValue(false);
     }
 }

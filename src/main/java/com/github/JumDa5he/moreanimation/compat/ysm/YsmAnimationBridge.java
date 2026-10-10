@@ -1,5 +1,6 @@
 package com.github.JumDa5he.moreanimation.compat.ysm;
 
+import com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent;
 import com.github.JumDa5he.moreanimation.compat.animation.MaidAnimationData;
 import com.github.JumDa5he.moreanimation.client.FaceInteractionState;
 import com.github.JumDa5he.moreanimation.client.FaceInteractionMath;
@@ -27,8 +28,9 @@ public final class YsmAnimationBridge {
     private static final Logger LOG = LogManager.getLogger();
     private static final String PACKAGE = "com.elfmcys.yesstevemodel.";
     private static final Set<String> SUPPORTED_ACTIONS = Set.of(
+            LeanLookEvent.LEFT, LeanLookEvent.RIGHT,
             "circledance", "!??!", "come", "come2", "weidu", "ha", "tastetail", "eattail", "sleep2", "situp",
-            "sit2", "moresleep4", "moresleep6",
+            "sit2", "moresleep4", "moresleep5", "moresleep6",
             "cold_hug_shiver", "ground_hurt",
             "maid_bow", "refuse", "injured_kneel", "death_fall", "death_drown", "death_burn",
             "death_ranged", "fear_retreat_fall", "pet_reaction", "pet_reaction_hold", "pet_other_head",
@@ -172,7 +174,7 @@ public final class YsmAnimationBridge {
                 }
             }
 
-            boolean applyAction = SUPPORTED_ACTIONS.contains(action)
+            boolean applyAction = SUPPORTED_ACTIONS.contains(action) && (!"moresleep5".equals(action) || com.github.JumDa5he.moreanimation.groom.GroomingSession.posed(maid))
                     && !com.github.JumDa5he.moreanimation.client.CuteYsmOrder.bodyBusy(maid);
             boolean applyExpression = SUPPORTED_EXPRESSIONS.contains(expression);
             boolean tailExclusive = TailInteractionState.isInteractionActive(maid.getId());
@@ -246,7 +248,7 @@ public final class YsmAnimationBridge {
             }
             if (applyAction) {
                 YsmAnimationClip clip = clips.get(action);
-                if (com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action)) {
+                if (com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid) || LeanLookEvent.isPlaying(maid) || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action) || com.github.JumDa5he.moreanimation.groom.GroomingSession.posed(maid)) {
                     Set<String> owned = new HashSet<>();
                     for (var channel : clip.channels) owned.add(channel.bone());
                     for (String key : owned) {
@@ -261,13 +263,13 @@ public final class YsmAnimationBridge {
                     }
                 }
                 double elapsedSeconds = (now - actionStart + partialTick) / 20.0;
-                double seconds = MaidAnimationData.isLoopingAction(action)
+                double seconds = MaidAnimationData.isLoopingAction(maid, action)
                         ? Math.max(0, elapsedSeconds) % clip.length
                         : Math.min(clip.length, Math.max(0, elapsedSeconds));
                 applyClip(action, clip, seconds, byName, byNormalizedName, saved, missingBones, false, maid.getHealth(), maid.getMaxHealth());
             }
             if (applyExpression) {
-                if (com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action) && clips.containsKey(action)) {
+                if ((LeanLookEvent.isPlaying(maid) || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action)) && clips.containsKey(action)) {
                     byName = new HashMap<>(byName); byNormalizedName = new HashMap<>(byNormalizedName);
                     for (var channel : clips.get(action).channels) {
                         byName.remove(channel.bone()); byNormalizedName.remove(channel.bone().toLowerCase(Locale.ROOT));

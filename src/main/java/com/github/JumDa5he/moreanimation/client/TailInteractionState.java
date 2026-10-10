@@ -228,40 +228,8 @@ public final class TailInteractionState {
 
         private void tick() {
             if (frozen) return;
-            for (int i = 0; i < CHAIN_WEIGHTS.length; i++) {
-                float weightedYaw;
-                float weightedPitch;
-                if (i == 0) {
-                    weightedYaw = targetYaw * CHAIN_WEIGHTS[i];
-                    weightedPitch = targetPitch * CHAIN_WEIGHTS[i];
-                } else {
-                    float ratio = CHAIN_WEIGHTS[i] / CHAIN_WEIGHTS[i - 1];
-                    weightedYaw = (currentYaw[i - 1]
-                            + velocityYaw[i - 1] * CHAIN_VELOCITY_TRANSFER[i]) * ratio;
-                    weightedPitch = (currentPitch[i - 1]
-                            + velocityPitch[i - 1] * CHAIN_VELOCITY_TRANSFER[i]) * ratio;
-                }
-                float stiffness = CHAIN_STIFFNESS[i]
-                        * (holding ? 1.0f : RETURN_STIFFNESS_MULTIPLIER);
-                velocityYaw[i] = (velocityYaw[i]
-                        + (weightedYaw - currentYaw[i]) * stiffness) * CHAIN_DAMPING[i];
-                velocityPitch[i] = (velocityPitch[i]
-                        + (weightedPitch - currentPitch[i]) * stiffness) * CHAIN_DAMPING[i];
-                float velocityLimit = MAX_ANGULAR_VELOCITY
-                        * Math.max(0.35f, CHAIN_WEIGHTS[i] / CHAIN_WEIGHTS[0]);
-                velocityYaw[i] = Mth.clamp(velocityYaw[i], -velocityLimit, velocityLimit);
-                velocityPitch[i] = Mth.clamp(velocityPitch[i], -velocityLimit, velocityLimit);
-                currentYaw[i] += velocityYaw[i];
-                currentPitch[i] += velocityPitch[i];
-                if (!Float.isFinite(currentYaw[i]) || !Float.isFinite(currentPitch[i])
-                        || !Float.isFinite(velocityYaw[i]) || !Float.isFinite(velocityPitch[i])) {
-                    currentYaw[i] = currentPitch[i] = velocityYaw[i] = velocityPitch[i] = 0;
-                }
-                if (!holding && Math.abs(currentYaw[i]) < 0.0005f && Math.abs(currentPitch[i]) < 0.0005f
-                        && Math.abs(velocityYaw[i]) < 0.0005f && Math.abs(velocityPitch[i]) < 0.0005f) {
-                    currentYaw[i] = currentPitch[i] = velocityYaw[i] = velocityPitch[i] = 0;
-                }
-            }
+            com.github.JumDa5he.moreanimation.compat.animation.TailSpringMath.advancePair(
+                    currentYaw, velocityYaw, targetYaw, currentPitch, velocityPitch, targetPitch, holding);
         }
 
         private boolean isEffectivelyZero() {

@@ -9,8 +9,9 @@ import java.util.*;
 public final class ProtectedExpressionBones {
     private static Object manager;
     private static final Map<String,Set<String>> ACTION_BONES=new HashMap<>();
+    public static void reload() { manager=null;ACTION_BONES.clear(); }
     public static boolean owns(EntityMaid maid,String bone) {
-        if(!CuteInteractionCompat.protectedMaid(maid))return false;
+        if(!CuteInteractionCompat.protectedMaid(maid)&&!com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(maid)&&!com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid))return false;
         if(FaceInteractionState.isInteractionActive(maid.getId())) {
             String n=bone.toLowerCase(Locale.ROOT).replace("_","");
             if(Set.of("head","mhead","allhead","ear").contains(n)||FaceInteractionState.earSide(bone)!=0)return true;

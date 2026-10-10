@@ -35,7 +35,9 @@
     "cute.CuteLowHealthPoseMixin",
     "cute.CutePullwbHandlerMixin",
     "cute.CuteManualPacketMixin",
-    "cute.CuteMaidsitMixin"
+    "cute.CuteMaidsitMixin",
+    "GroomingEntityMixin",
+    "CryingDamageMixin"
   ],
   "client": [
     "AnimationManagerMixin",
@@ -43,6 +45,7 @@
     "GeckoMaidEntityMixin",
     "GeckoModelLoaderMixin",
     "YsmRendererMixin",
+    "YsmLeanGazeMixin",
     "GeckoFaceAnchorMixin",
     "TailSniffCameraMixin",
     "StandingHandItemsMixin",

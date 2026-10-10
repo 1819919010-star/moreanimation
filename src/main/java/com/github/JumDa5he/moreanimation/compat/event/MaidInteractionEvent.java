@@ -64,15 +64,19 @@ public class MaidInteractionEvent {
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level)) return;
-        for (EntityMaid maid : loadedMaids(level)) {
+        List<? extends EntityMaid> maids = loadedMaids(level);
+        for (EntityMaid maid : maids) {
             if (maid.getPersistentData().getBoolean(CONTROL_ACTIVE) && !isMovementControlled(maid)) {
                 endControl(maid);
             }
             restoreBowPose(maid);
             BegAnimationEvent.serverTick(maid);
             BrokenLegEvent.serverTick(maid);
+            CryingEvent.tick(maid);
             MaidAnimationData.serverTick(maid);
+            LeanLookEvent.serverTick(maid);
             GameLostAnimation.serverTick(maid);
+            ColdBiomeShiverEvent.serverTick(maid);
             if (maid.isAlive() && level.getGameTime() % 5 == 0 && !isMovementControlled(maid)) {
                 tickBowAndRefuse(maid);
             }
@@ -81,6 +85,7 @@ public class MaidInteractionEvent {
             }
         }
         tickSessions(level);
+        LeanLookEvent.tickPlayers(level, maids);
     }
 
 
@@ -170,12 +175,12 @@ public class MaidInteractionEvent {
             }
             return;
         }
-        if (event.getAmount() >= MoreAnimationConfig.getInjuredDamageThreshold()
-                && survives
-                && MaidAnimationData.injuredAuto(maid)) {
-            MaidAnimationData.start(maid, "injured_kneel", MaidAnimationData.duration("injured_kneel"),
-                    MaidAnimationData.PRIORITY_INJURED, true);
-        }
+    }
+
+    /** 保留原单次重伤阈值和地面接触伤害排除；开关只控制身体动作。 */
+    public static boolean isSevereInjury(EntityMaid maid, DamageSource source, float finalDamage) {
+        return maid.isAlive() && !isGroundContactDamage(source)
+                && finalDamage >= MoreAnimationConfig.getInjuredDamageThreshold();
     }
 
     private static boolean isGroundContactDamage(DamageSource source) {
@@ -323,7 +328,7 @@ public class MaidInteractionEvent {
 
     public static boolean isMovementControlled(EntityMaid maid) {
         UUID id = maid.getUUID();
-        if (SESSIONS.containsKey(id) || StandingHandEvent.controls(maid)) return true;
+        if (SESSIONS.containsKey(id) || StandingHandEvent.controls(maid) || com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(maid)) return true;
         for (Session session : SESSIONS.values()) {
             if (session.target.equals(id)) return true;
         }

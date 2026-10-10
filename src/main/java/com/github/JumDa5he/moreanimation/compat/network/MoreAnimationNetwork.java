@@ -8,7 +8,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.Optional;
 
 public class MoreAnimationNetwork {
-    private static final String PROTOCOL_VERSION = "14";
+    private static final String PROTOCOL_VERSION = "19";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation("moreanimation:anim"),
             () -> PROTOCOL_VERSION,
@@ -17,6 +17,15 @@ public class MoreAnimationNetwork {
     );
 
     public static void init() {
+        CHANNEL.registerMessage(39, GroomingPartsPacket.class, GroomingPartsPacket::encode, GroomingPartsPacket::new, GroomingPartsPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(40, GroomingContactPacket.class, GroomingContactPacket::encode, GroomingContactPacket::new, GroomingContactPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(37, CryingSyncPacket.class, CryingSyncPacket::encode, CryingSyncPacket::new, CryingSyncPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(38, FaceFeedbackPacket.class, FaceFeedbackPacket::encode, FaceFeedbackPacket::new, FaceFeedbackPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(36, GroomingTailPacket.class, GroomingTailPacket::encode, GroomingTailPacket::new, GroomingTailPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(33, GroomingPacket.class, GroomingPacket::encode, GroomingPacket::new, GroomingPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(34, GroomingInput.class, GroomingInput::encode, GroomingInput::new, GroomingInput::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(35, GroomingBrushPacket.class, GroomingBrushPacket::encode, GroomingBrushPacket::new, GroomingBrushPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+
         CHANNEL.registerMessage(32, CuteProtectionPacket.class, CuteProtectionPacket::encode, CuteProtectionPacket::new, CuteProtectionPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         CHANNEL.registerMessage(30, StandingHandStatePacket.class, StandingHandStatePacket::encode, StandingHandStatePacket::new, StandingHandStatePacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         CHANNEL.registerMessage(31, StandingHandCancelPacket.class, StandingHandCancelPacket::encode, StandingHandCancelPacket::new, StandingHandCancelPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));

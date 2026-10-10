@@ -167,8 +167,12 @@ public final class YsmAnimationClip {
                 || !"catmullrom".equals(object.get("lerp_mode").getAsString())) {
             throw new IllegalArgumentException("Unsupported complex keyframe in " + action);
         }
+        // Blockbench 可同时导出相同的前后值；这仍是连续关键帧，不改变原有插值。
+        if (object.has("pre") && !object.get("pre").equals(object.get("post"))) {
+            throw new IllegalArgumentException("Unsupported discontinuous keyframe in " + action);
+        }
         for (String key : object.keySet()) {
-            if (!Set.of("post", "lerp_mode").contains(key)) {
+            if (!Set.of("pre", "post", "lerp_mode").contains(key)) {
                 throw new IllegalArgumentException("Unsupported complex keyframe property in " + action + ": " + key);
             }
         }

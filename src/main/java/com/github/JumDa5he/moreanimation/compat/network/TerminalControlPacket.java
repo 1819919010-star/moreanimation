@@ -80,6 +80,12 @@ public class TerminalControlPacket {
                     sendData(player, maid);
                 }
                 case "play" -> {
+                    if (com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.GROUP.equals(value)) {
+                        if (!com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.tryStartLeanLook(maid,
+                                com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.TriggerReason.MANUAL))
+                            player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.moreanimation.lean_look.busy"), true);
+                        return;
+                    }
                     if (value.startsWith("hand_hold_") || value.startsWith("player_hand_hold_")) return;
                     MaidAnimationData.start(maid, value, MaidAnimationData.duration(value),
                         "injured_kneel".equals(value) ? MaidAnimationData.PRIORITY_INJURED : MaidAnimationData.PRIORITY_MANUAL,

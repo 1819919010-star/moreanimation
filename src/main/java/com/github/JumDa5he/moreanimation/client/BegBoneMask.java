@@ -9,6 +9,7 @@ import java.util.Set;
 
 public final class BegBoneMask {
     private static Set<String> bones;
+    private static final java.util.Map<String, Set<String>> leanBones = new java.util.HashMap<>();
     public static Set<String> bones() {
         if (bones == null) {
             try (var reader = new InputStreamReader(Minecraft.getInstance().getResourceManager().open(
@@ -34,5 +35,19 @@ public final class BegBoneMask {
             }
         });
     }
-    public static void reload() { bones = null; }
+    public static Set<String> leanBones(String action) {
+        if (!com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.LEFT.equals(action)
+                && !com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.RIGHT.equals(action)) return Set.of();
+        return leanBones.computeIfAbsent(action, key -> {
+            try (var reader = new InputStreamReader(Minecraft.getInstance().getResourceManager().open(
+                    new ResourceLocation("moreanimation", "animation/unknown.animation.json")), StandardCharsets.UTF_8)) {
+                return Set.copyOf(JsonParser.parseReader(reader).getAsJsonObject().getAsJsonObject("animations")
+                        .getAsJsonObject(key).getAsJsonObject("bones").keySet());
+            } catch (Exception e) {
+                org.apache.logging.log4j.LogManager.getLogger().error("无法读取侧头动作骨骼覆盖列表", e);
+                return Set.of();
+            }
+        });
+    }
+    public static void reload() { bones = null; leanBones.clear(); LeanLookGaze.reload(); }
 }

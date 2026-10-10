@@ -11,6 +11,7 @@ import org.lwjgl.glfw.GLFW;
 
 @Mod.EventBusSubscriber(modid = MoreAnimation.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class ClientKeyMappings {
+    public static final KeyMapping GROOMING = new KeyMapping("key.moreanimation.grooming", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_PERIOD, "key.categories.moreanimation");
     public static final KeyMapping TAIL_INTERACTION = new KeyMapping(
             "key.moreanimation.tail_interaction",
             InputConstants.Type.KEYSYM,
@@ -33,6 +34,7 @@ public final class ClientKeyMappings {
 
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
+        event.register(GROOMING);
         event.register(TAIL_INTERACTION);
         event.register(TAIL_SNIFF);
         event.register(FACE_INTERACTION);

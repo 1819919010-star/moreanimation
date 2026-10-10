@@ -16,6 +16,7 @@ public class MoreAnimationConfig {
     public static ForgeConfigSpec.DoubleValue STAND_CHANCE;
     public static ForgeConfigSpec.BooleanValue STAND_CIRCLEDANCE;
     public static ForgeConfigSpec.BooleanValue STAND_QUESTION;
+    public static ForgeConfigSpec.BooleanValue STAND_LEAN_LOOK;
 
     public static ForgeConfigSpec.IntValue SLEEP_INTERVAL_SECONDS;
     public static ForgeConfigSpec.DoubleValue SLEEP_CHANCE;
@@ -23,6 +24,7 @@ public class MoreAnimationConfig {
     public static ForgeConfigSpec.BooleanValue SLEEP_SLEEP2;
     public static ForgeConfigSpec.BooleanValue SLEEP_SITUP;
     public static ForgeConfigSpec.DoubleValue INJURED_DAMAGE_THRESHOLD;
+    public static ForgeConfigSpec.DoubleValue CRY_DAMAGE_THRESHOLD;
     public static ForgeConfigSpec.BooleanValue WINEFOX_LOW_HEALTH_FOX;
     public static ForgeConfigSpec.BooleanValue AUTO_PET_DEFAULT;
     public static ForgeConfigSpec.BooleanValue AUTO_HUG_DEFAULT;
@@ -55,6 +57,11 @@ public class MoreAnimationConfig {
                 .define("lowHealthFoxForm", true);
         b.pop();
 
+        b.push("crying");
+        CRY_DAMAGE_THRESHOLD = b.comment("累计受伤哭泣阈值：连续受伤间隔不超过30秒，实际生命损失累计达到阈值后哭泣。范围10～100，默认20。")
+                .translation("config.moreanimation.cryDamageThreshold").defineInRange("cryDamageThreshold", 20.0, 10.0, 100.0);
+        b.pop();
+
         b.push("injured");
         INJURED_DAMAGE_THRESHOLD = b.comment("单次受到至少多少点最终伤害时播放重伤倒地动画（无冷却）")
                 .defineInRange("damageThreshold", 10.0, 0.1, 2048.0);
@@ -65,6 +72,8 @@ public class MoreAnimationConfig {
         STAND_CHANCE = b.comment("站着时每次尝试触发概率（0~1）").defineInRange("chance", 0.2, 0.0, 1.0);
         STAND_CIRCLEDANCE = b.comment("站着动作：circledance").define("circledance", true);
         STAND_QUESTION = b.comment("站着动作：!??!").define("question", true);
+        STAND_LEAN_LOOK = b.comment("站着动作：侧头看，抽中后左右各一半概率")
+                .translation("config.moreanimation.stand.leanLook").define("leanLook", true);
         b.pop();
 
         b.push("sleep");
@@ -94,6 +103,10 @@ public class MoreAnimationConfig {
             case "sleep": return SLEEP_CHANCE.get();
             default: return 0.2;
         }
+    }
+
+    public static double getCryDamageThreshold() {
+        return com.github.JumDa5he.moreanimation.compat.event.CryDamageCounter.clampThreshold(CRY_DAMAGE_THRESHOLD.get());
     }
 
     public static double getInjuredDamageThreshold() {
@@ -127,6 +140,7 @@ public class MoreAnimationConfig {
             case "stand":
                 if (STAND_CIRCLEDANCE.get()) list.add("circledance");
                 if (STAND_QUESTION.get()) list.add("!??!");
+                if (STAND_LEAN_LOOK.get()) list.add("lean_look");
                 break;
             case "sleep":
                 if (SLEEP_COME.get()) list.add("come");

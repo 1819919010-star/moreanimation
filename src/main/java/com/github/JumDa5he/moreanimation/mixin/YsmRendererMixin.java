@@ -28,6 +28,7 @@ public abstract class YsmRendererMixin {
     private void moreanimation$restore(@Coerce Object animatable, ResourceLocation texture,
                                        float entityYaw, float partialTick, PoseStack poseStack,
                                        MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
+        com.github.JumDa5he.moreanimation.groom.GroomingYsm.restore(animatable);
         com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.restore(animatable);
         YsmAnimationBridge.before(animatable);
         com.github.JumDa5he.moreanimation.client.CuteYsmOrder.before(animatable);
@@ -48,6 +49,7 @@ public abstract class YsmRendererMixin {
                                          float entityYaw,float partialTick,PoseStack stack,
                                          MultiBufferSource buffer,int light,CallbackInfo ci) {
         com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.apply(animatable,stack,partialTick);
+        com.github.JumDa5he.moreanimation.groom.GroomingYsm.apply(animatable,stack);
     }
     @Inject(method = RENDER_METHOD, at = @At(value = "INVOKE", target =
             "Lcom/elfmcys/yesstevemodel/OOoo0o0oO000ooO0Oo00OoOo;Oo0Oo0o00O00Oo0OOoOOoooo(Lcom/elfmcys/yesstevemodel/OOOO0O0O000O000000oOOO0o;Lcom/elfmcys/yesstevemodel/o0000OoOooO0oo0o0oooo0Oo;FLnet/minecraft/client/renderer/RenderType;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILcom/mojang/blaze3d/vertex/VertexConsumer;IIFFFF)V", shift = At.Shift.AFTER))
@@ -56,11 +58,13 @@ public abstract class YsmRendererMixin {
                                          MultiBufferSource buffer,int light,CallbackInfo ci) {
         com.github.JumDa5he.moreanimation.compat.ysm.YsmFaceAnchors.capture(animatable,stack);
         com.github.JumDa5he.moreanimation.compat.ysm.YsmTailAnchors.capture(animatable,texture,stack);
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmTearAnchors.capture(animatable,texture,stack,buffer,light);
     }
     @Inject(method=RENDER_METHOD,at=@At("RETURN"))
     private void moreanimation$finishFace(@Coerce Object animatable,ResourceLocation texture,
                                         float entityYaw,float partialTick,PoseStack stack,
                                         MultiBufferSource buffer,int light,CallbackInfo ci){
+        com.github.JumDa5he.moreanimation.groom.GroomingYsm.restore(animatable);
         com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.restore(animatable);
         com.github.JumDa5he.moreanimation.compat.ysm.YsmFaceAnchors.finish();
     }}

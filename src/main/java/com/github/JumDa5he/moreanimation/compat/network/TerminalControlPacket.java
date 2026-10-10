@@ -66,6 +66,10 @@ public record TerminalControlPacket(int maidId, String command, String category,
                     sendData(player, maid);
                 }
                 case "play" -> {
+                    if (com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.GROUP.equals(packet.value())) {
+                        if (!com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.tryStartLeanLook(maid, com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.TriggerReason.MANUAL)) player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.moreanimation.lean_look.busy"), true);
+                        return;
+                    }
                     if (packet.value().startsWith("hand_hold_") || packet.value().startsWith("player_hand_hold_")) return;
                     MaidAnimationData.start(maid, packet.value(), MaidAnimationData.duration(packet.value()),
                         "injured_kneel".equals(packet.value())

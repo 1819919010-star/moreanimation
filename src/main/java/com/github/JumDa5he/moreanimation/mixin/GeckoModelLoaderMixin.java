@@ -28,6 +28,7 @@ public class GeckoModelLoaderMixin {
     @Inject(method = "reload", at = @At("HEAD"), remap = false)
     private static void moreanimation$clearAnimationCache(CallbackInfo ci) {
         moreanimation$animations = null;
+        com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.reload();
         com.github.JumDa5he.moreanimation.client.StandingHandBoneMask.reload();
     }
 

@@ -26,6 +26,7 @@ public class ExpressionScreen extends Screen {
     private final Map<String, Integer> masks = new LinkedHashMap<>();
     private Tab tab = Tab.EXPRESSIONS;
     private boolean injuredAuto = true;
+    private boolean tearsEnabled;
     private boolean autoPet = false;
     private boolean autoHug = false;
     private boolean randomSleepPose = true;
@@ -116,6 +117,11 @@ public class ExpressionScreen extends Screen {
                     "gui.moreanimation.interaction." + interaction,
                     () -> sendControl("interaction", "", interaction, true));
         }
+        tearsEnabled = com.github.JumDa5he.moreanimation.client.tears.LocalTears.enabled(maidId);
+        addToggle(x + 186, y + 100, 178, Component.translatable(tearsEnabled
+                ? "gui.moreanimation.tears.on" : "gui.moreanimation.tears.off"), tearsEnabled, () -> {
+            com.github.JumDa5he.moreanimation.client.tears.LocalTears.toggle(maidId); rebuild();
+        });
         graphicsHintButton(x, y + 139);
     }
 
@@ -193,6 +199,12 @@ public class ExpressionScreen extends Screen {
         graphics.fill(left + 12, top + 64, left + PANEL_W - 12, top + 65, 0xFF314559);
         graphics.drawCenteredString(font, title, width / 2, top + 15, 0xFFF4F7FB);
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (tab == Tab.INTERACTION && tearsEnabled != com.github.JumDa5he.moreanimation.client.tears.LocalTears.enabled(maidId)) rebuild();
     }
 
     @Override

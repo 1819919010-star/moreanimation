@@ -172,6 +172,8 @@ public final class TailInteractionState {
         checkLevel();
         if(active&&id==maidId)return;
         if(!interaction){INTERACTIONS.remove(id);POSES.remove(id);return;}
+        var level=Minecraft.getInstance().level;
+        if(level==null||!(level.getEntity(id) instanceof EntityMaid))return;
         INTERACTIONS.put(id,sitting);if(tail.isEmpty())return;
         var tails=POSES.get(id);
         if(tails!=null&&!tails.containsKey(tail)&&tails.size()>=128)return;

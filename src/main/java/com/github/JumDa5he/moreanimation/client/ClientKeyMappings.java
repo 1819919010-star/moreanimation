@@ -24,6 +24,8 @@ public final class ClientKeyMappings {
             GLFW.GLFW_KEY_COMMA,
             "key.categories.moreanimation");
 
+    public static final KeyMapping GROOMING = new KeyMapping("key.moreanimation.grooming", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_PERIOD, "key.categories.moreanimation");
+
     private ClientKeyMappings() {
     }
 
@@ -32,5 +34,6 @@ public final class ClientKeyMappings {
         event.register(TAIL_INTERACTION);
         event.register(TAIL_SNIFF);
         event.register(FACE_INTERACTION);
+        event.register(GROOMING);
     }
 }

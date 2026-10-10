@@ -22,7 +22,7 @@ import java.util.*;
 /** 仅登记通过校验的真实会话，不保存实体、世界或永久标签。 */
 @EventBusSubscriber(modid="moreanimation")
 public final class CuteInteractionCompat {
-    public enum Kind { TAIL, FACE, HAND, MAID_PAIR }
+    public enum Kind { TAIL, FACE, HAND, MAID_PAIR, GROOM }
     public record Lease(UUID token, ResourceKey<Level> dimension, Kind kind) {}
     private static final Map<UUID, Lease> SERVER = new HashMap<>();
     private static final Map<UUID, Lease> CLIENT = new java.util.concurrent.ConcurrentHashMap<>();
@@ -72,14 +72,17 @@ public final class CuteInteractionCompat {
         if(!protectedMaid(maid)||priority>=MaidAnimationData.PRIORITY_DEATH) return true;
         Lease lease=(maid.level().isClientSide?CLIENT:SERVER).get(maid.getUUID());
         return switch(lease.kind()) {
+            case GROOM -> action.equals("moresleep5");
             case TAIL -> false;
-            case FACE -> action.equals("slapright")||action.equals("slapleft");
+            case FACE -> action.equals("slapright")||action.equals("slapleft")
+                    || action.equals(com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.CRY_FEEDBACK_ACTION) && com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid);
             case HAND -> com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action);
             case MAID_PAIR -> Set.of("pet_other_head_raise","pet_other_head","pet_reaction","pet_reaction_hold","hugtogether").contains(action);
         };
     }
     private static boolean live(EntityMaid maid,Kind kind) {
         return switch(kind) {
+            case GROOM -> com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(maid);
             case TAIL -> MaidAnimationData.isTailInteractionActive(maid);
             case FACE -> MaidAnimationData.isFaceInteractionActive(maid);
             case HAND -> StandingHandEvent.controls(maid);

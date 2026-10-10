@@ -28,6 +28,8 @@ public abstract class YsmRendererMixin {
     private void moreanimation$restore(@Coerce Object animatable, ResourceLocation texture,
                                        float entityYaw, float partialTick, PoseStack poseStack,
                                        MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
+        com.github.JumDa5he.moreanimation.groom.GroomingGeometry.restore(animatable);
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmLeanGaze.restore(animatable);
         com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.restore(animatable);
         YsmAnimationBridge.before(animatable);
         com.github.JumDa5he.moreanimation.client.CuteYsmOrder.before(animatable);
@@ -39,6 +41,7 @@ public abstract class YsmRendererMixin {
                                      float entityYaw, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, CallbackInfo ci) {
         com.github.JumDa5he.moreanimation.client.CuteYsmOrder.after(animatable, partialTick);
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmLeanGaze.restore(animatable);
         YsmAnimationBridge.after(animatable, partialTick);
     }
 
@@ -49,6 +52,8 @@ public abstract class YsmRendererMixin {
                                               MultiBufferSource buffers, int light, CallbackInfo ci) {
         // 此时 1.21 渲染器已经完成实体朝向与模型缩放，坐标可用于骨骼定位。
         com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.apply(animatable, stack, partialTick);
+        com.github.JumDa5he.moreanimation.groom.GroomingYsm.apply(animatable,stack);
+        com.github.JumDa5he.moreanimation.compat.ysm.YsmTearAnchors.capture(animatable,texture,stack,buffers,light);
         com.github.JumDa5he.moreanimation.compat.ysm.YsmTailAnchors.capture(animatable, texture, stack);
         YsmFaceAnchors.capture(animatable, stack);
     }
@@ -57,6 +62,7 @@ public abstract class YsmRendererMixin {
     private void moreanimation$restorePlayerPose(@Coerce Object animatable, ResourceLocation texture,
                                                 float yaw, float partialTick, PoseStack stack,
                                                 MultiBufferSource buffers, int light, CallbackInfo ci) {
+        com.github.JumDa5he.moreanimation.groom.GroomingGeometry.restore(animatable);
         com.github.JumDa5he.moreanimation.compat.ysm.YsmStandingHandPose.restore(animatable);
     }
 }

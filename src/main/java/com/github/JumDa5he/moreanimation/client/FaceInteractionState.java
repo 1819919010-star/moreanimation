@@ -409,6 +409,8 @@ public final class FaceInteractionState {
     }
 
     public static void receiveRemotePose(int entityId, boolean interactionActive, FacePoseData target) {
+        var level = Minecraft.getInstance().level;
+        if (level == null || !(level.getEntity(entityId) instanceof EntityMaid)) return;
         if (active && entityId == maidId) return;
         SmoothedPose pose = POSES.computeIfAbsent(entityId, ignored -> new SmoothedPose());
         pose.setInteraction(interactionActive);
@@ -832,7 +834,7 @@ public final class FaceInteractionState {
     public static boolean slapPlaying(int entityId) {
         var level = Minecraft.getInstance().level;
         return level != null && level.getEntity(entityId) instanceof EntityMaid maid
-                && FaceInteractionEvent.isSlap(maid);
+                && FaceInteractionEvent.controlsFaceBody(maid);
     }
 
     private static void sendStroke(byte phase) {

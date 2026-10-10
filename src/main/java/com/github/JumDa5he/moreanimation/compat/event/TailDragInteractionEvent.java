@@ -38,6 +38,7 @@ public final class TailDragInteractionEvent {
     private static final int OVERSTRETCH_DIALOGUE_COUNT = 7;
     private static final int SNIFF_DIALOGUE_COUNT = 7;
     private static final Map<UUID, Session> BY_PLAYER = new HashMap<>();
+    public static boolean playerBusy(UUID id) { return BY_PLAYER.containsKey(id); }
     private static final Map<UUID, UUID> BY_MAID = new HashMap<>();
     private static final Map<UUID, Long> LAST_OVERSTRETCH_DIALOGUE = new HashMap<>();
 
@@ -45,7 +46,7 @@ public final class TailDragInteractionEvent {
     }
 
     public static void begin(ServerPlayer player, EntityMaid maid) {
-        if (StandingHandEvent.controls(maid) || StandingHandEvent.playerBusy(player.getUUID())
+        if (com.github.JumDa5he.moreanimation.groom.GroomingSession.controls(maid) || com.github.JumDa5he.moreanimation.groom.GroomingSession.playerBusy(player.getUUID()) || StandingHandEvent.controls(maid) || StandingHandEvent.playerBusy(player.getUUID())
                 || !player.isAlive() || player.isSpectator() || !maid.isAlive() || maid.isRemoved()
                 || player.level() != maid.level() || player.distanceToSqr(maid) > START_DISTANCE_SQR
                 || !maid.isOwnedBy(player) || BY_MAID.containsKey(maid.getUUID())

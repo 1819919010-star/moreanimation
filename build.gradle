@@ -59,6 +59,11 @@ dependencies {
     implementation "maven.modrinth:touhou-little-maid:${tlm_version}"
 }
 
+// 只在显式开启时创建独立复现运行；不加入正式编译、发布或 jarJar 配置。
+if (providers.gradleProperty('withMaidSpellTest').map { it.toBoolean() }.getOrElse(false)) {
+    apply from: 'gradle/maid-spell-test.gradle'
+}
+
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     filteringCharset = 'UTF-8'
     var replaceProperties = [

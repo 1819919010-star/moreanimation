@@ -11,10 +11,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Camera.class)
 public abstract class TailSniffCameraMixin {
+ @Shadow private boolean detached;
+ @Shadow public abstract Vec3 getPosition();
  @Shadow protected abstract void setPosition(Vec3 position);
  @Shadow protected abstract void setRotation(float yaw,float pitch);
  @Inject(method="setup",at=@At("RETURN"))
  private void moreanimation$sniff(BlockGetter level,Entity entity,boolean detached,boolean mirrored,float partialTick,CallbackInfo ci){
+  var grooming=com.github.JumDa5he.moreanimation.groom.GroomingClient.view(getPosition());if(grooming!=null){this.detached=false;setPosition(grooming.position());setRotation(grooming.yaw(),grooming.pitch());return;}
   var view=TailSniffCamera.view();if(view!=null){setPosition(view.position());setRotation(view.yaw(),view.pitch());}
  }
 }

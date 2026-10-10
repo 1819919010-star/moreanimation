@@ -6,10 +6,18 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public class MoreAnimationNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("2.0.0");
+        PayloadRegistrar registrar = event.registrar("2.1.0");
+        registrar.playToServer(GroomingContactPacket.TYPE,GroomingContactPacket.STREAM_CODEC,GroomingContactPacket::handle);
+        registrar.playToServer(GroomingPartsPacket.TYPE,GroomingPartsPacket.STREAM_CODEC,GroomingPartsPacket::handle);
+        registrar.playToServer(GroomingInput.TYPE,GroomingInput.STREAM_CODEC,GroomingInput::handle);
         registrar.playToServer(StandingHandCancelPacket.TYPE, StandingHandCancelPacket.STREAM_CODEC, StandingHandCancelPacket::handle);
 
         if (FMLEnvironment.dist.isClient()) {
+            registrar.playToClient(FaceFeedbackPacket.TYPE,FaceFeedbackPacket.STREAM_CODEC,FaceFeedbackPacket::handle);
+            registrar.playToClient(CryingSyncPacket.TYPE,CryingSyncPacket.STREAM_CODEC,CryingSyncPacket::handle);
+            registrar.playToClient(GroomingPacket.TYPE,GroomingPacket.STREAM_CODEC,GroomingPacket::handle);
+            registrar.playToClient(GroomingBrushPacket.TYPE,GroomingBrushPacket.STREAM_CODEC,GroomingBrushPacket::handle);
+            registrar.playToClient(GroomingTailPacket.TYPE,GroomingTailPacket.STREAM_CODEC,GroomingTailPacket::handle);
             registrar.playToClient(StandingHandStatePacket.TYPE, StandingHandStatePacket.STREAM_CODEC, StandingHandStatePacket::handle);
             registrar.playToClient(CuteProtectionPacket.TYPE, CuteProtectionPacket.STREAM_CODEC, CuteProtectionPacket::handle);
             registrar.playToClient(HuggingSyncPacket.TYPE, HuggingSyncPacket.STREAM_CODEC, HuggingSyncPacket::handle);
@@ -35,6 +43,11 @@ public class MoreAnimationNetwork {
             registrar.playToClient(SlapFeedbackPacket.TYPE, SlapFeedbackPacket.STREAM_CODEC,
                     SlapFeedbackPacket::handle);
         } else {
+            registrar.playToClient(FaceFeedbackPacket.TYPE,FaceFeedbackPacket.STREAM_CODEC,(pkt,ctx)->{});
+            registrar.playToClient(CryingSyncPacket.TYPE,CryingSyncPacket.STREAM_CODEC,(pkt,ctx)->{});
+            registrar.playToClient(GroomingPacket.TYPE,GroomingPacket.STREAM_CODEC,(pkt,ctx)->{});
+            registrar.playToClient(GroomingBrushPacket.TYPE,GroomingBrushPacket.STREAM_CODEC,(pkt,ctx)->{});
+            registrar.playToClient(GroomingTailPacket.TYPE,GroomingTailPacket.STREAM_CODEC,(pkt,ctx)->{});
             registrar.playToClient(StandingHandStatePacket.TYPE, StandingHandStatePacket.STREAM_CODEC, (pkt, ctx) -> { });
             registrar.playToClient(CuteProtectionPacket.TYPE, CuteProtectionPacket.STREAM_CODEC, (pkt, ctx) -> { });
             registrar.playToClient(HuggingSyncPacket.TYPE, HuggingSyncPacket.STREAM_CODEC, (pkt, ctx) -> {

@@ -29,6 +29,8 @@ import java.util.Set;
 @Mixin(AnimationProcessor.class)
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AnimationProcessorMixin {
+    @org.spongepowered.asm.mixin.Unique private float moreanimation$originalYaw, moreanimation$originalPitch;
+    @org.spongepowered.asm.mixin.Unique private boolean moreanimation$gazeChanged;
                                                                                  
     private static final Set<String> EXCLUSIVE_INTERACTIONS = Set.of(
             "pet_other_head_raise", "pet_other_head", "pet_reaction", "pet_reaction_hold", "hugtogether",
@@ -38,11 +40,17 @@ public class AnimationProcessorMixin {
                                                AnimationContext context,
                                                CallbackInfoReturnable<Boolean> cir) {
         FaceInteractionState.restoreGecko((AnimationProcessor) (Object) this);
+        moreanimation$gazeChanged=false;
+        var maid=ActualMaid.from(event.getAnimatableEntity());
+        if(maid==null)return;
+        var gaze=com.github.JumDa5he.moreanimation.client.LeanLookGaze.correct(maid,context.data().netHeadYaw,context.data().headPitch,event.getPartialTick());
+        if(gaze!=null){moreanimation$originalYaw=context.data().netHeadYaw;moreanimation$originalPitch=context.data().headPitch;moreanimation$gazeChanged=true;context.data().netHeadYaw=gaze.x;context.data().headPitch=gaze.y;}
     }
     @Inject(method = "tickAnimation", at = @At("RETURN"), remap = false)
     private void moreanimation$hideUnusedExpressionSeven(double seekTime, AnimationEvent event,
                                                           AnimationContext context,
                                                           CallbackInfoReturnable<Boolean> cir) {
+        if(moreanimation$gazeChanged){context.data().netHeadYaw=moreanimation$originalYaw;context.data().headPitch=moreanimation$originalPitch;moreanimation$gazeChanged=false;}
         EntityMaid maid = ActualMaid.from(event.getAnimatableEntity());
         if (maid == null) return;
         IBone expressionSeven = ((AnimationProcessor) (Object) this).getBone("Expression_7");
@@ -71,6 +79,19 @@ public class AnimationProcessorMixin {
                 crashWhenCantFindBone, rendererDirty, scheduledUpdate);
         EntityMaid maid = ActualMaid.from(event.getAnimatableEntity());
         if (maid == null) return;
+        if (com.github.JumDa5he.moreanimation.groom.GroomingSession.posed(maid) && !"main".equals(controller.getName()) && !"parallel_5_controller".equals(controller.getName())) {
+            for(Object value:controller.getBoneAnimationQueues()) {
+                BoneAnimationQueue q=(BoneAnimationQueue)value;
+                if(com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.owns(maid,q.topLevelSnapshot.bone.getName())){q.rotationQueue().clear();q.positionQueue().clear();q.scaleQueue().clear();}
+            }
+        }
+        if((com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid) || com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.isPlaying(maid)) && !"parallel_6_controller".equals(controller.getName()) && event.getAnimatableEntity() instanceof GeckoMaidEntity<?> leanGecko){
+            var owned=BegBoneMask.loaded(leanGecko,MaidAnimationData.activeAction(maid)).bones();
+            for(Object value:controller.getBoneAnimationQueues()){
+                BoneAnimationQueue q=(BoneAnimationQueue)value;
+                if(owned.contains(q.topLevelSnapshot.bone.getName()) || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid) && com.github.JumDa5he.moreanimation.client.ProtectedExpressionBones.owns(maid,q.topLevelSnapshot.bone.getName())){q.rotationQueue().clear();q.positionQueue().clear();q.scaleQueue().clear();}
+            }
+        }
         Set<String> protectedBones = Set.of();
         Object target = event.getAnimatableEntity();
         Set<String> sessionBones = new java.util.HashSet<>();
@@ -173,11 +194,12 @@ public class AnimationProcessorMixin {
     private static boolean moreanimation$isExclusiveController(AnimationController controller, AnimationEvent event) {
         EntityMaid maid = ActualMaid.from(event.getAnimatableEntity());
         if (maid == null) return false;
+        if ("main".equals(controller.getName()) && com.github.JumDa5he.moreanimation.groom.GroomingSession.posed(maid)) return true;
         if ("parallel_7_controller".equals(controller.getName())) return true;
         if (!"parallel_6_controller".equals(controller.getName())) return false;
         Object animatable = event.getAnimatableEntity();
         if (!(animatable instanceof GeckoMaidEntity<?>)) return false;
-        return EXCLUSIVE_INTERACTIONS.contains(MaidAnimationData.activeAction(maid))
+        return com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(maid) || com.github.JumDa5he.moreanimation.compat.event.LeanLookEvent.isPlaying(maid) || EXCLUSIVE_INTERACTIONS.contains(MaidAnimationData.activeAction(maid))
                 || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(MaidAnimationData.activeAction(maid));
     }
 }

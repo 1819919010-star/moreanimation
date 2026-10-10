@@ -4,7 +4,8 @@
     "package": "com.github.JumDa5he.moreanimation.mixin",
     "compatibilityLevel": "JAVA_21",
     "mixins": [
-        "AnimationManagerMixin",
+        "CryingDamageMixin",
+        "GroomingEntityMixin",
         "BrokenLegSpeedMixin",
         "LivingEntityDeathMixin",
         "MaidFollowOwnerTaskMixin",
@@ -38,11 +39,13 @@
         "cute.CuteMaidsitMixin"
     ],
     "client": [
+        "AnimationManagerMixin",
         "AnimationProcessorMixin",
         "GeckoMaidEntityMixin",
         "GeckoFaceAnchorMixin",
         "GeckoModelLoaderMixin",
         "YsmRendererMixin",
+        "YsmLeanGazeMixin",
         "TailSniffCameraMixin",
         "StandingHandItemsMixin",
         "StandingHandPlayerMixin",

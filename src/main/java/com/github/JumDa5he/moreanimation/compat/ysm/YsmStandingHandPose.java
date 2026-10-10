@@ -28,6 +28,9 @@ public final class YsmStandingHandPose {
   try{
    init();if(!(entity.invoke(a) instanceof LivingEntity living))return;
    var state=StandingHandClient.state(living.getUUID());if(state==null||state.packet.phase()<1)return;
+   boolean playerRole=living.getUUID().equals(state.packet.player());
+   if(playerRole ? !(living instanceof net.minecraft.world.entity.player.Player)
+           : !(living instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid))return;
    Object runtime=model.invoke(a);if(runtime==null)return;ILocationModel loc=(ILocationModel)location.invoke(runtime);
    Map<ILocationBone,Object> nativeBones=new IdentityHashMap<>();List<Saved> saved=new ArrayList<>();SAVED.put(a,saved);
    for(Object b:((Map<?,?>)bones.invoke(runtime)).values())nativeBones.put((ILocationBone)asLocation.invoke(b),b);
@@ -38,7 +41,7 @@ public final class YsmStandingHandPose {
      public void rotation(Vector3f v){try{if(saved.stream().noneMatch(s->s.bone==b&&s.offset==0))saved.add(new Saved(b,0,read(b,0)));write(b,0,v);}catch(ReflectiveOperationException ex){throw new IllegalStateException(ex);}}
     });
    }
-   if(living.getUUID().equals(state.packet.player())){
+   if(playerRole){
     StandingHandPose.player(living,joints,loc.leftHandBones(),loc.rightHandBones(),root,partial);
     if(living==net.minecraft.client.Minecraft.getInstance().player&&StandingHandView.firstPersonBody())for(Object b:nativeBones.values()){
      String n=(String)name.invoke(b);if(n.equals("AllHead")||n.equals("MHead")){saved.add(new Saved(b,6,read(b,6)));write(b,6,new Vector3f(0));}

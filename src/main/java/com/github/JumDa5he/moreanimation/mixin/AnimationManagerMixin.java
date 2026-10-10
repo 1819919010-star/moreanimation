@@ -84,7 +84,8 @@ public class AnimationManagerMixin {
         if (com.github.JumDa5he.moreanimation.client.CuteYsmOrder.bodyBusy(entity)) return;
         String action = MaidAnimationData.activeAction(entity);
         AnimationController<?> interactionController = event.getController();
-        boolean slap = "slapright".equals(action) || "slapleft".equals(action);
+        boolean slap = "slapright".equals(action) || "slapleft".equals(action)
+                || com.github.JumDa5he.moreanimation.compat.event.FaceInteractionEvent.feedbackActive(entity);
         if (slap || com.github.JumDa5he.moreanimation.compat.animation.StandingHandAnimations.ACTIONS.contains(action)) {
             slapTransitionLengths.putIfAbsent(interactionController, interactionController.transitionLengthTicks);
             interactionController.transitionLengthTicks = 0;
@@ -100,7 +101,7 @@ public class AnimationManagerMixin {
         InteractionPlayback playback = new InteractionPlayback(action, start);
         InteractionPlayback previous = interactionActionStart.put(uuid, playback);
         if (!playback.equals(previous)) event.getController().markNeedsReload();
-        ILoopType loop = MaidAnimationData.isLoopingAction(action)
+        ILoopType loop = MaidAnimationData.isLoopingAction(entity, action)
                 ? ILoopType.EDefaultLoopTypes.LOOP : ILoopType.EDefaultLoopTypes.PLAY_ONCE;
         if (play(event, action, loop)) {
             cir.setReturnValue(PlayState.CONTINUE);
@@ -149,7 +150,7 @@ public class AnimationManagerMixin {
         long start = MaidAnimationData.activeStart(entity);
         Long oldStart = forcedActionStart.put(uuid, start);
         if (oldStart == null || oldStart.longValue() != start) event.getController().markNeedsReload();
-        ILoopType loop = MaidAnimationData.isLoopingAction(action)
+        ILoopType loop = MaidAnimationData.isLoopingAction(entity, action)
                 ? ILoopType.EDefaultLoopTypes.LOOP : ILoopType.EDefaultLoopTypes.PLAY_ONCE;
         if (play(event, action, loop)) {
             cir.setReturnValue(PlayState.CONTINUE);
@@ -163,7 +164,7 @@ public class AnimationManagerMixin {
         EntityMaid entity = ActualMaid.from(event.getAnimatableEntity());
         if (entity == null) return;
         UUID uuid = entity.getUUID();
-        if (entity.isSleeping()) {
+        if (entity.isSleeping() || com.github.JumDa5he.moreanimation.groom.GroomingSession.posed(entity)) {
             GameLostAnimation.releaseMisc(uuid);
             cir.setReturnValue(PlayState.STOP);
             cir.cancel();

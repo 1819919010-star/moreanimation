@@ -2,7 +2,7 @@ package com.github.JumDa5he.moreanimation.client;
 
                                                                                              
 public final class SlapComboState {
-    public static final long TIMEOUT_MS = 2000;
+    public static final long TIMEOUT_MS = com.github.JumDa5he.moreanimation.compat.network.SlapComboTiming.TIMEOUT_MS;
     private int count;
     private long lastSlap;
 
